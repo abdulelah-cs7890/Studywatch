@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Study Watch</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%231c1212'/%3E%3Cpath d='M32 14c2 7-8 11-8 22a 8 8 0 0 0 16 0c0-5-3-8-3-12 4 3 7 7 7 12a12 12 0 1 1-24 0c0-12 10-15 12-22z' fill='%23ff9226'/%3E%3Cpath d='M32 30c1 4-4 6-4 10a4 4 0 0 0 8 0c0-4-5-6-4-10z' fill='%23ffd97a'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --accent: #ffc079;
+    --accent-soft: #ffce93;
+    --dot-on: #ffc98a;
+    --glow: 255, 168, 92;
+    --glass-tint: rgba(38, 44, 66, 0.34);
+    --ink: #f4ead9;
+    --ink-dim: rgba(244, 234, 217, 0.55);
+  }
+  body.theme-midnight {
+    --accent: #9db8ff;
+    --accent-soft: #b6caff;
+    --dot-on: #aac4ff;
+    --glow: 130, 160, 255;
+    --ink: #e8edf8;
+    --ink-dim: rgba(232, 237, 248, 0.55);
+  }
+  body.theme-ember {
+    --accent: #ff9a52;
+    --accent-soft: #ffb070;
+    --dot-on: #ffb070;
+    --glow: 255, 122, 48;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 116%, rgba(255,168,92,0.30), transparent 60%),
+      radial-gradient(ellipse 90% 70% at 50% -10%, rgba(60,80,140,0.35), transparent 60%),
+      linear-gradient(180deg, #10172b 0%, #1a2440 52%, #241f33 100%);
+    -webkit-font-smoothing: antialiased;
+    transition: background 1s ease;
+  }
+  body.theme-midnight {
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 116%, rgba(90,120,220,0.22), transparent 60%),
+      radial-gradient(ellipse 90% 70% at 50% -10%, rgba(40,60,120,0.4), transparent 60%),
+      linear-gradient(180deg, #080d1c 0%, #0e1730 52%, #131228 100%);
+  }
+  body.theme-ember {
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 116%, rgba(255,122,48,0.34), transparent 60%),
+      radial-gradient(ellipse 90% 70% at 50% -10%, rgba(22,58,58,0.5), transparent 65%),
+      linear-gradient(180deg, #0c1517 0%, #15191a 38%, #1f1714 62%, #241412 100%);
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+  /* ---------- deep sky: moon + twinkling stars (behind the 3D scene) ---------- */
+  #sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  #moon {
+    position: absolute; left: 23%; top: 8%; width: 56px; height: 56px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 34%, #fdf6e3, #ecdcba 58%, #d9c69c);
+    box-shadow:
+      0 0 28px 7px rgba(255, 236, 190, 0.32),
+      0 0 90px 34px rgba(255, 220, 160, 0.12);
+  }
+  #moon::before, #moon::after {
+    content: ""; position: absolute; border-radius: 50%;
+    background: rgba(176, 152, 110, 0.4);
+  }
+  #moon::before { width: 12px; height: 12px; left: 30%; top: 48%; }
+  #moon::after { width: 7px; height: 7px; left: 58%; top: 26%; }
+  .star {
+    position: absolute; border-radius: 50%; background: #efe9dc;
+    opacity: .3;
+    animation: twinkle var(--d, 3s) ease-in-out infinite;
+  }
+  .star.bright { box-shadow: 0 0 6px 1px rgba(255, 244, 214, 0.7); }
+  @keyframes twinkle {
+    0%, 100% { opacity: .2; }
+    50% { opacity: .95; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .star { animation: none; opacity: .55; }
+  }
+  #vignette {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(ellipse 75% 70% at 50% 46%, transparent 55%, rgba(7, 9, 18, 0.5) 100%);
+  }
+
+  /* ---------- layout ---------- */
+  #ui {
+    position: fixed; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+    padding-right: 6vw;
+    padding-bottom: 64px;
+    pointer-events: none;
+  }
+  #controls { width: 372px; }
+  @media (max-width: 900px) {
+    #ui { align-items: center; padding-right: 0; }
+    #controls { width: auto; }
+  }
+  #ui > * { pointer-events: auto; }
+
+  /* ---------- glass watch ---------- */
+  #watchWrap {
+    position: relative;
+    width: 372px; height: 372px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #ring {
+    position: absolute; inset: 0; transform: rotate(-90deg);
+    pointer-events: none;
+  }
+  #ring .track {
+    fill: none; stroke: rgba(255, 224, 188, 0.09); stroke-width: 1;
+  }
+  #ring .prog {
+    fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round;
+    stroke-dasharray: 304.7; stroke-dashoffset: 0;
+    filter: drop-shadow(0 0 4px rgba(var(--glow), 0.7));
+    transition: stroke-dashoffset .6s linear, opacity .5s;
+    opacity: 0;
+  }
+  #watchWrap.running #ring .prog, #watchWrap.paused #ring .prog { opacity: 1; }
+  /* milestone pulse */
+  #pulse {
+    position: absolute; inset: 14px; border-radius: 50%;
+    border: 2px solid rgba(var(--glow), 0.8);
+    opacity: 0; pointer-events: none;
+  }
+  #pulse.go { animation: pulseRing 1.4s ease-out forwards; }
+  @keyframes pulseRing {
+    0% { opacity: .8; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.5); }
+  }
+  #watch {
+    position: relative;
+    width: 340px; height: 340px;
+    border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--glass-tint);
+    backdrop-filter: blur(9px) saturate(120%) brightness(1.05);
+    -webkit-backdrop-filter: blur(9px) saturate(120%) brightness(1.05);
+    border: 1px solid rgba(255, 224, 188, 0.22);
+    box-shadow:
+      inset 0 1px 1px rgba(255,240,220,0.35),
+      inset 0 -18px 40px rgba(10,14,28,0.45),
+      0 24px 70px rgba(0,0,0,0.5),
+      0 0 0 9px rgba(255,255,255,0.015);
+    overflow: hidden;
+    transition: box-shadow .5s ease;
+  }
+  /* top sheen */
+  #watch::before {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(120% 80% at 30% 8%, rgba(255,245,230,0.28), transparent 42%);
+    pointer-events: none;
+  }
+  #watch.finished {
+    box-shadow:
+      inset 0 1px 1px rgba(255,240,220,0.5),
+      inset 0 -18px 50px rgba(var(--glow), 0.4),
+      0 0 60px rgba(var(--glow), 0.55),
+      0 24px 70px rgba(0,0,0,0.5);
+  }
+
+  #label {
+    font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 14px; font-weight: 600;
+    transition: color .4s;
+  }
+  #watch.running #label { color: var(--accent-soft); }
+
+  #clock { display: flex; align-items: center; gap: 7px; }
+  .dm-digit {
+    display: grid;
+    grid-template-columns: repeat(5, var(--dot, 7px));
+    grid-template-rows: repeat(7, var(--dot, 7px));
+    gap: 3px;
+  }
+  .dm-colon {
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 16px; margin: 0 2px;
+  }
+  .dm-dot {
+    width: var(--dot, 7px); height: var(--dot, 7px); border-radius: 50%;
+    background: rgba(255, 240, 220, 0.06);
+    transition: background .12s linear, box-shadow .12s linear;
+  }
+  .dm-dot.on {
+    background: var(--dot-on);
+    box-shadow: 0 0 7px 1px rgba(var(--glow), 0.75), 0 0 2px rgba(255,210,160,0.9);
+  }
+  #subline {
+    margin-top: 14px; font-size: 11px; letter-spacing: 2px;
+    color: var(--ink-dim); text-transform: uppercase;
+  }
+
+  /* ---------- control cluster ---------- */
+  #controls {
+    margin-top: 30px;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  .presets { display: flex; gap: 10px; }
+  .chip {
+    font: inherit; font-size: 13px; font-weight: 600; letter-spacing: .5px;
+    color: var(--ink-dim); white-space: nowrap;
+    padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,224,188,0.14);
+    backdrop-filter: blur(6px);
+    transition: all .18s ease;
+  }
+  .chip:hover { color: var(--ink); border-color: rgba(255,224,188,0.3); }
+  .chip.active {
+    color: #1a1206; background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 4px 18px rgba(var(--glow), 0.35);
+  }
+
+  .transport { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    font: inherit; cursor: pointer; color: var(--ink);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,224,188,0.16);
+    backdrop-filter: blur(6px);
+    border-radius: 999px;
+    transition: all .18s ease;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,224,188,0.34); }
+  #startBtn {
+    padding: 13px 34px; font-size: 15px; font-weight: 600; letter-spacing: 1px;
+    color: #1a1206; background: var(--accent); border-color: var(--accent);
+    box-shadow: 0 6px 24px rgba(var(--glow), 0.34);
+  }
+  #startBtn:hover { background: var(--accent-soft); }
+  #startBtn.running { color: var(--ink); background: rgba(255,255,255,0.06); box-shadow: none; }
+  #resetBtn { padding: 13px 18px; font-size: 14px; color: var(--ink-dim); }
+
+  /* ---------- bottom bar: free-floating pills ---------- */
+  #bottom {
+    position: fixed; left: 0; right: 0; bottom: 22px; z-index: 2;
+    display: flex; justify-content: center; gap: 12px; align-items: center;
+    flex-wrap: wrap; padding: 0 16px;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 10px 18px; border-radius: 999px;
+    background: rgba(24, 18, 16, 0.42);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,224,188,0.13);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.3);
+  }
+  .pill .lbl {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .pet {
+    cursor: pointer; user-select: none; white-space: nowrap;
+    transition: all .2s ease;
+  }
+  .pet .swatch { width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,0.15); flex: none; }
+  .pet .pname { font-size: 13px; font-weight: 600; color: var(--ink); letter-spacing: .3px; }
+  .pet .pspec { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink-dim); }
+  .pet:not(.on) { opacity: .42; filter: saturate(0.3); }
+  .pet:hover { opacity: 1; border-color: rgba(255,224,188,0.3); }
+
+  #rain { width: 130px; accent-color: var(--accent); cursor: pointer; }
+  input[type="range"] { height: 4px; }
+
+  /* ---------- stats + hint ---------- */
+  #stats {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 2; padding: 8px 18px; border-radius: 999px;
+    background: rgba(20, 26, 44, 0.38);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,224,188,0.12);
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--ink-dim); white-space: nowrap;
+    opacity: 0; transition: opacity .6s;
+    pointer-events: none;
+  }
+  #stats.show { opacity: 1; }
+  #stats b { color: var(--accent); font-weight: 600; }
+  #stats.bump { animation: statBump .5s ease; }
+  @keyframes statBump {
+    0% { transform: translateX(-50%) scale(1); }
+    40% { transform: translateX(-50%) scale(1.12); }
+    100% { transform: translateX(-50%) scale(1); }
+  }
+  /* pet toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%) translateY(8px);
+    z-index: 2; padding: 8px 18px; border-radius: 999px;
+    background: rgba(24, 18, 16, 0.55);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,224,188,0.16);
+    font-size: 13px; font-weight: 600; letter-spacing: .5px; color: var(--ink);
+    opacity: 0; transition: opacity .25s ease, transform .25s ease;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast .heart { color: #ff9eb0; margin-right: 6px; }
+  #hint {
+    position: fixed; right: 22px; top: 20px; z-index: 2;
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--ink-dim); opacity: .65; text-align: right; line-height: 1.9;
+    pointer-events: none;
+  }
+  @media (max-width: 760px) { #hint { display: none; } }
+
+  @media (max-height: 720px) {
+    #watchWrap { width: 312px; height: 312px; }
+    #watch { width: 280px; height: 280px; }
+    #controls { width: 312px; }
+    .dm-dot { --dot: 6px; }
+    #controls { margin-top: 20px; gap: 12px; }
+  }
+  @media (max-height: 600px) {
+    #watchWrap { width: 246px; height: 246px; }
+    #watch { width: 222px; height: 222px; }
+    #controls { width: 246px; }
+    .dm-dot { --dot: 5px; }
+    .dm-colon { gap: 11px; }
+    #label { margin-bottom: 8px; }
+    #subline { margin-top: 8px; }
+    #controls { margin-top: 14px; gap: 10px; }
+    .chip { padding: 7px 13px; font-size: 12px; }
+    #startBtn { padding: 10px 26px; font-size: 14px; }
+    #resetBtn { padding: 10px 14px; }
+  }
+</style>
+</head>
+<body class="theme-ember">
+  <div id="sky">
+    <div id="moon"></div>
+  </div>
+  <canvas id="scene"></canvas>
+  <div id="vignette"></div>
+
+  <div id="ui">
+    <div id="watchWrap">
+      <svg id="ring" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="track" cx="50" cy="50" r="48.5"></circle>
+        <circle class="prog" cx="50" cy="50" r="48.5"></circle>
+      </svg>
+      <div id="watch">
+        <div id="label">Ready</div>
+        <div id="clock"></div>
+        <div id="subline">Focus session</div>
+      </div>
+      <div id="pulse"></div>
+    </div>
+
+    <div id="controls">
+      <div class="presets" id="presets">
+        <button class="chip" data-min="10">10 min</button>
+        <button class="chip active" data-min="30">30 min</button>
+        <button class="chip" data-min="45">45 min</button>
+        <button class="chip" data-min="60">60 min</button>
+      </div>
+      <div class="transport">
+        <button class="btn" id="startBtn">Start</button>
+        <button class="btn" id="resetBtn">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="stats"></div>
+  <div id="toast"></div>
+  <div id="hint">Click a friend to pet them<br />Tap the floor to call one over<br />Space start &middot; R reset</div>
+
+  <div id="bottom">
+    <span class="pill pet on" data-type="redpanda"><span class="swatch" style="background:#c2562a"></span><span class="pname">Miso</span><span class="pspec">red panda</span></span>
+    <span class="pill pet on" data-type="cat"><span class="swatch" style="background:#9aa3b5"></span><span class="pname">Mochi</span><span class="pspec">cat</span></span>
+    <span class="pill pet on" data-type="shiba"><span class="swatch" style="background:#d9a86c"></span><span class="pname">Hachi</span><span class="pspec">inu</span></span>
+    <span class="pill"><span class="lbl">Rain</span><input type="range" id="rain" min="0" max="100" value="45" /></span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="js/dotmatrix.js"></script>
+  <script src="js/animals.js"></script>
+  <script src="js/scene.js"></script>
+  <script>
+  (function () {
+    const LS = 'studywatch.v1';
+    const watchEl = document.getElementById('watch');
+    const watchWrap = document.getElementById('watchWrap');
+    const ringProg = document.querySelector('#ring .prog');
+    const RING_C = 304.7;
+    const pulseEl = document.getElementById('pulse');
+    const statsEl = document.getElementById('stats');
+
+    function firePulse() {
+      pulseEl.classList.remove('go');
+      void pulseEl.offsetWidth;
+      pulseEl.classList.add('go');
+      if (window.Watch.stoke) window.Watch.stoke(0.7);
+    }
+
+    // ---- daily stats ----
+    const STATS_LS = 'studywatch.stats.v1';
+    function loadStats() {
+      const today = new Date().toISOString().slice(0, 10);
+      try {
+        const s = JSON.parse(localStorage.getItem(STATS_LS));
+        if (s && s.date === today) return s;
+      } catch (e) {}
+      return { date: today, minutes: 0, sessions: 0 };
+    }
+    let stats = loadStats();
+    function renderStats() {
+      if (stats.sessions === 0) { statsEl.classList.remove('show'); return; }
+      statsEl.innerHTML = 'Today &middot; <b>' + stats.minutes + ' min</b> &middot; ' +
+        stats.sessions + (stats.sessions === 1 ? ' session' : ' sessions');
+      statsEl.classList.add('show');
+      statsEl.classList.remove('bump');
+      void statsEl.offsetWidth;
+      statsEl.classList.add('bump');
+    }
+
+    // pet toast
+    const PET_NAMES = { redpanda: 'Miso', cat: 'Mochi', shiba: 'Hachi' };
+    const PET_LINES = ['loved that', 'is happy', 'purrs', 'wiggles', 'feels cozy'];
+    const toastEl = document.getElementById('toast');
+    let toastTimer = null;
+    window.Watch.onPet = function (type) {
+      const line = type === 'cat' ? (Math.random() < 0.4 ? 'purrs' : PET_LINES[Math.floor(Math.random() * PET_LINES.length)])
+        : PET_LINES[Math.floor(Math.random() * PET_LINES.length)];
+      toastEl.innerHTML = '<span class="heart">&hearts;</span>' + PET_NAMES[type] + ' ' + line;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1500);
+    };
+    const labelEl = document.getElementById('label');
+    const sublineEl = document.getElementById('subline');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const presets = document.getElementById('presets');
+    const rainSlider = document.getElementById('rain');
+
+    const clock = window.DotMatrix.createClock(document.getElementById('clock'));
+
+    // ---- state ----
+    let state = {
+      presetMin: 30,
+      remaining: 30 * 60,   // seconds
+      running: false,
+      endTime: 0,           // performance-now ms when running
+      rain: 45,
+      pets: { redpanda: true, cat: true, shiba: true }
+    };
+
+    // restore
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS));
+      if (saved) {
+        state.presetMin = saved.presetMin ?? 30;
+        state.rain = saved.rain ?? 45;
+        state.pets = saved.pets ?? state.pets;
+        if (saved.running && saved.endTimeAbs) {
+          const rem = (saved.endTimeAbs - Date.now()) / 1000;
+          if (rem > 0) { state.remaining = rem; state.running = true; }
+          else { state.remaining = saved.presetMin * 60; state.running = false; }
+        } else {
+          state.remaining = saved.remaining ?? saved.presetMin * 60;
+        }
+      }
+    } catch (e) {}
+
+    function save() {
+      localStorage.setItem(LS, JSON.stringify({
+        presetMin: state.presetMin,
+        remaining: state.remaining,
+        rain: state.rain,
+        pets: state.pets,
+        running: state.running,
+        endTimeAbs: state.running ? Date.now() + state.remaining * 1000 : 0
+      }));
+    }
+
+    // ---- star field ----
+    (function () {
+      const sky = document.getElementById('sky');
+      for (let i = 0; i < 110; i++) {
+        const s = document.createElement('span');
+        s.className = 'star' + (Math.random() < 0.12 ? ' bright' : '');
+        const sz = (Math.random() * 1.7 + 0.8).toFixed(1);
+        s.style.width = sz + 'px';
+        s.style.height = sz + 'px';
+        s.style.left = (Math.random() * 100).toFixed(2) + '%';
+        // denser toward the top of the sky
+        s.style.top = (Math.pow(Math.random(), 1.6) * 54).toFixed(2) + '%';
+        s.style.setProperty('--d', (2.2 + Math.random() * 4).toFixed(1) + 's');
+        s.style.animationDelay = (Math.random() * 6).toFixed(1) + 's';
+        sky.appendChild(s);
+      }
+    })();
+
+    // ---- init scene ----
+    window.Watch.init(document.getElementById('scene'));
+    window.Watch.setTheme('ember');
+    window.Watch.setRain(state.rain);
+    rainSlider.value = state.rain;
+    for (const t in state.pets) window.Watch.setAnimalActive(t, state.pets[t]);
+    document.querySelectorAll('.pet').forEach(p => {
+      p.classList.toggle('on', state.pets[p.dataset.type]);
+    });
+    // sync preset chips
+    document.querySelectorAll('.chip').forEach(c => {
+      c.classList.toggle('active', +c.dataset.min === state.presetMin);
+    });
+
+    // ---- render display ----
+    let colonOn = true;
+    function render() {
+      clock.setTime(state.remaining);
+      clock.setColon(colonOn);
+      watchEl.classList.toggle('running', state.running);
+      const total = state.presetMin * 60;
+      const paused = !state.running && state.remaining > 0 && state.remaining < total;
+      watchWrap.classList.toggle('running', state.running);
+      watchWrap.classList.toggle('paused', paused);
+      ringProg.style.strokeDashoffset = (RING_C * (1 - state.remaining / total)).toFixed(1);
+      if (state.running) {
+        labelEl.textContent = 'Focusing';
+        sublineEl.textContent = 'Stay with it';
+      } else if (state.remaining <= 0) {
+        labelEl.textContent = 'Done';
+        sublineEl.textContent = 'Well studied';
+      } else if (paused) {
+        labelEl.textContent = 'Paused';
+        sublineEl.textContent = 'Take a breath';
+      } else {
+        labelEl.textContent = 'Ready';
+        sublineEl.textContent = state.presetMin + ' minute session';
+      }
+      startBtn.textContent = state.running ? 'Pause' : (state.remaining <= 0 ? 'Restart' : 'Start');
+      startBtn.classList.toggle('running', state.running);
+      renderTitle();
+    }
+
+    // ---- timer loop ----
+    let lastQ = 0;
+    function checkTimer() {
+      if (!state.running) return;
+      const rem = (state.endTime - performance.now()) / 1000;
+      state.remaining = Math.max(0, rem);
+      // quarter-session milestone pulses
+      const total = state.presetMin * 60;
+      const q = Math.floor((1 - state.remaining / total) * 4);
+      if (q > lastQ && q < 4) { lastQ = q; firePulse(); }
+      if (state.remaining <= 0) finish();
+    }
+    function tick() {
+      checkTimer();
+      render();
+      requestAnimationFrame(tick);
+    }
+    // safety net: rAF is throttled/paused in background tabs, but study
+    // sessions usually run while you work in ANOTHER tab — keep the timer,
+    // milestones, finish + title honest with a steady interval.
+    setInterval(() => { checkTimer(); renderTitle(); }, 1000);
+
+    // tab title countdown
+    let lastTitle = '';
+    function renderTitle() {
+      let t;
+      if (state.running) {
+        const m = Math.floor(state.remaining / 60);
+        const s = Math.floor(state.remaining % 60);
+        t = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + ' \u00b7 Study Watch';
+      } else if (state.remaining <= 0) {
+        t = '\u2713 Done \u00b7 Study Watch';
+      } else {
+        t = 'Study Watch';
+      }
+      if (t !== lastTitle) { document.title = t; lastTitle = t; }
+    }
+
+    // colon blink
+    setInterval(() => {
+      colonOn = state.running ? !colonOn : true;
+    }, 500);
+
+    // periodic save
+    setInterval(() => { if (state.running) save(); }, 2000);
+
+    function start() {
+      if (state.remaining <= 0) state.remaining = state.presetMin * 60;
+      state.running = true;
+      state.endTime = performance.now() + state.remaining * 1000;
+      lastQ = Math.floor((1 - state.remaining / (state.presetMin * 60)) * 4);
+      watchEl.classList.remove('finished');
+      window.Watch.setMode('focus');
+      firePulse();
+      save();
+    }
+    function pause() {
+      state.running = false;
+      window.Watch.setMode('idle');
+      save();
+    }
+    function reset() {
+      state.running = false;
+      state.remaining = state.presetMin * 60;
+      watchEl.classList.remove('finished');
+      window.Watch.setMode('idle');
+      save();
+    }
+    function finish() {
+      state.running = false;
+      state.remaining = 0;
+      watchEl.classList.add('finished');
+      window.Watch.celebrate(7);
+      firePulse();
+      stats = loadStats();
+      stats.minutes += state.presetMin;
+      stats.sessions += 1;
+      localStorage.setItem(STATS_LS, JSON.stringify(stats));
+      renderStats();
+      setTimeout(() => watchEl.classList.remove('finished'), 7000);
+      save();
+    }
+
+    // ---- events ----
+    startBtn.addEventListener('click', () => {
+      if (state.running) pause(); else start();
+    });
+    resetBtn.addEventListener('click', reset);
+
+    presets.addEventListener('click', e => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      state.presetMin = +chip.dataset.min;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      if (!state.running) { state.remaining = state.presetMin * 60; watchEl.classList.remove('finished'); }
+      save();
+    });
+
+    rainSlider.addEventListener('input', () => {
+      state.rain = +rainSlider.value;
+      window.Watch.setRain(state.rain);
+      save();
+    });
+
+    document.getElementById('bottom').addEventListener('click', e => {
+      const pet = e.target.closest('.pet');
+      if (!pet) return;
+      const t = pet.dataset.type;
+      // keep at least one friend
+      const onCount = Object.values(state.pets).filter(Boolean).length;
+      if (state.pets[t] && onCount <= 1) return;
+      state.pets[t] = !state.pets[t];
+      pet.classList.toggle('on', state.pets[t]);
+      window.Watch.setAnimalActive(t, state.pets[t]);
+      save();
+    });
+
+    // keyboard shortcuts
+    window.addEventListener('keydown', e => {
+      if (e.target.matches('input, textarea, select')) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (state.running) pause(); else start();
+      } else if (e.key === 'r' || e.key === 'R') {
+        reset();
+      }
+    });
+
+    // resume focus mode if restored running
+    if (state.running) {
+      state.endTime = performance.now() + state.remaining * 1000;
+      window.Watch.setMode('focus');
+    }
+
+    render();
+    renderStats();
+    tick();
+  })();
+  </script>
+</body>
+</html>
