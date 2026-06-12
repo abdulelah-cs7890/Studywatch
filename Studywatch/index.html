@@ -1,0 +1,2436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Study Watch</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%231c1212'/%3E%3Cpath d='M32 14c2 7-8 11-8 22a 8 8 0 0 0 16 0c0-5-3-8-3-12 4 3 7 7 7 12a12 12 0 1 1-24 0c0-12 10-15 12-22z' fill='%23ff9226'/%3E%3Cpath d='M32 30c1 4-4 6-4 10a4 4 0 0 0 8 0c0-4-5-6-4-10z' fill='%23ffd97a'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --accent: #ffc079;
+    --accent-soft: #ffce93;
+    --dot-on: #ffc98a;
+    --glow: 255, 168, 92;
+    --glass-tint: rgba(38, 44, 66, 0.34);
+    --ink: #f4ead9;
+    --ink-dim: rgba(244, 234, 217, 0.55);
+  }
+  body.theme-midnight {
+    --accent: #9db8ff;
+    --accent-soft: #b6caff;
+    --dot-on: #aac4ff;
+    --glow: 130, 160, 255;
+    --ink: #e8edf8;
+    --ink-dim: rgba(232, 237, 248, 0.55);
+  }
+  body.theme-ember {
+    --accent: #ff9a52;
+    --accent-soft: #ffb070;
+    --dot-on: #ffb070;
+    --glow: 255, 122, 48;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 116%, rgba(255,168,92,0.30), transparent 60%),
+      radial-gradient(ellipse 90% 70% at 50% -10%, rgba(60,80,140,0.35), transparent 60%),
+      linear-gradient(180deg, #10172b 0%, #1a2440 52%, #241f33 100%);
+    -webkit-font-smoothing: antialiased;
+    transition: background 1s ease;
+  }
+  body.theme-midnight {
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 116%, rgba(90,120,220,0.22), transparent 60%),
+      radial-gradient(ellipse 90% 70% at 50% -10%, rgba(40,60,120,0.4), transparent 60%),
+      linear-gradient(180deg, #080d1c 0%, #0e1730 52%, #131228 100%);
+  }
+  body.theme-ember {
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 116%, rgba(255,122,48,0.34), transparent 60%),
+      radial-gradient(ellipse 90% 70% at 50% -10%, rgba(22,58,58,0.5), transparent 65%),
+      linear-gradient(180deg, #0c1517 0%, #15191a 38%, #1f1714 62%, #241412 100%);
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+  /* ---------- deep sky: moon + twinkling stars (behind the 3D scene) ---------- */
+  #sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  #moon {
+    position: absolute; left: 23%; top: 8%; width: 56px; height: 56px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 34%, #fdf6e3, #ecdcba 58%, #d9c69c);
+    box-shadow:
+      0 0 28px 7px rgba(255, 236, 190, 0.32),
+      0 0 90px 34px rgba(255, 220, 160, 0.12);
+  }
+  #moon::before, #moon::after {
+    content: ""; position: absolute; border-radius: 50%;
+    background: rgba(176, 152, 110, 0.4);
+  }
+  #moon::before { width: 12px; height: 12px; left: 30%; top: 48%; }
+  #moon::after { width: 7px; height: 7px; left: 58%; top: 26%; }
+  .star {
+    position: absolute; border-radius: 50%; background: #efe9dc;
+    opacity: .3;
+    animation: twinkle var(--d, 3s) ease-in-out infinite;
+  }
+  .star.bright { box-shadow: 0 0 6px 1px rgba(255, 244, 214, 0.7); }
+  @keyframes twinkle {
+    0%, 100% { opacity: .2; }
+    50% { opacity: .95; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .star { animation: none; opacity: .55; }
+  }
+  #vignette {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(ellipse 75% 70% at 50% 46%, transparent 55%, rgba(7, 9, 18, 0.5) 100%);
+  }
+
+  /* ---------- layout ---------- */
+  #ui {
+    position: fixed; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+    padding-right: 6vw;
+    padding-bottom: 64px;
+    pointer-events: none;
+  }
+  #controls { width: 372px; }
+  @media (max-width: 900px) {
+    #ui { align-items: center; padding-right: 0; }
+    #controls { width: auto; }
+  }
+  #ui > * { pointer-events: auto; }
+
+  /* ---------- glass watch ---------- */
+  #watchWrap {
+    position: relative;
+    width: 372px; height: 372px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #ring {
+    position: absolute; inset: 0; transform: rotate(-90deg);
+    pointer-events: none;
+  }
+  #ring .track {
+    fill: none; stroke: rgba(255, 224, 188, 0.09); stroke-width: 1;
+  }
+  #ring .prog {
+    fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round;
+    stroke-dasharray: 304.7; stroke-dashoffset: 0;
+    filter: drop-shadow(0 0 4px rgba(var(--glow), 0.7));
+    transition: stroke-dashoffset .6s linear, opacity .5s;
+    opacity: 0;
+  }
+  #watchWrap.running #ring .prog, #watchWrap.paused #ring .prog { opacity: 1; }
+  /* milestone pulse */
+  #pulse {
+    position: absolute; inset: 14px; border-radius: 50%;
+    border: 2px solid rgba(var(--glow), 0.8);
+    opacity: 0; pointer-events: none;
+  }
+  #pulse.go { animation: pulseRing 1.4s ease-out forwards; }
+  @keyframes pulseRing {
+    0% { opacity: .8; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.5); }
+  }
+  #watch {
+    position: relative;
+    width: 340px; height: 340px;
+    border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--glass-tint);
+    backdrop-filter: blur(9px) saturate(120%) brightness(1.05);
+    -webkit-backdrop-filter: blur(9px) saturate(120%) brightness(1.05);
+    border: 1px solid rgba(255, 224, 188, 0.22);
+    box-shadow:
+      inset 0 1px 1px rgba(255,240,220,0.35),
+      inset 0 -18px 40px rgba(10,14,28,0.45),
+      0 24px 70px rgba(0,0,0,0.5),
+      0 0 0 9px rgba(255,255,255,0.015);
+    overflow: hidden;
+    transition: box-shadow .5s ease;
+  }
+  /* top sheen */
+  #watch::before {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(120% 80% at 30% 8%, rgba(255,245,230,0.28), transparent 42%);
+    pointer-events: none;
+  }
+  #watch.finished {
+    box-shadow:
+      inset 0 1px 1px rgba(255,240,220,0.5),
+      inset 0 -18px 50px rgba(var(--glow), 0.4),
+      0 0 60px rgba(var(--glow), 0.55),
+      0 24px 70px rgba(0,0,0,0.5);
+  }
+
+  #label {
+    font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 14px; font-weight: 600;
+    transition: color .4s;
+  }
+  #watch.running #label { color: var(--accent-soft); }
+
+  #clock { display: flex; align-items: center; gap: 7px; }
+  .dm-digit {
+    display: grid;
+    grid-template-columns: repeat(5, var(--dot, 7px));
+    grid-template-rows: repeat(7, var(--dot, 7px));
+    gap: 3px;
+  }
+  .dm-colon {
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 16px; margin: 0 2px;
+  }
+  .dm-dot {
+    width: var(--dot, 7px); height: var(--dot, 7px); border-radius: 50%;
+    background: rgba(255, 240, 220, 0.06);
+    transition: background .12s linear, box-shadow .12s linear;
+  }
+  .dm-dot.on {
+    background: var(--dot-on);
+    box-shadow: 0 0 7px 1px rgba(var(--glow), 0.75), 0 0 2px rgba(255,210,160,0.9);
+  }
+  #subline {
+    margin-top: 14px; font-size: 11px; letter-spacing: 2px;
+    color: var(--ink-dim); text-transform: uppercase;
+  }
+
+  /* ---------- control cluster ---------- */
+  #controls {
+    margin-top: 30px;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  .presets { display: flex; gap: 10px; }
+  .chip {
+    font: inherit; font-size: 13px; font-weight: 600; letter-spacing: .5px;
+    color: var(--ink-dim); white-space: nowrap;
+    padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,224,188,0.14);
+    backdrop-filter: blur(6px);
+    transition: all .18s ease;
+  }
+  .chip:hover { color: var(--ink); border-color: rgba(255,224,188,0.3); }
+  .chip.active {
+    color: #1a1206; background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 4px 18px rgba(var(--glow), 0.35);
+  }
+
+  .transport { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    font: inherit; cursor: pointer; color: var(--ink);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,224,188,0.16);
+    backdrop-filter: blur(6px);
+    border-radius: 999px;
+    transition: all .18s ease;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,224,188,0.34); }
+  #startBtn {
+    padding: 13px 34px; font-size: 15px; font-weight: 600; letter-spacing: 1px;
+    color: #1a1206; background: var(--accent); border-color: var(--accent);
+    box-shadow: 0 6px 24px rgba(var(--glow), 0.34);
+  }
+  #startBtn:hover { background: var(--accent-soft); }
+  #startBtn.running { color: var(--ink); background: rgba(255,255,255,0.06); box-shadow: none; }
+  #resetBtn { padding: 13px 18px; font-size: 14px; color: var(--ink-dim); }
+
+  /* ---------- bottom bar: free-floating pills ---------- */
+  #bottom {
+    position: fixed; left: 0; right: 0; bottom: 22px; z-index: 2;
+    display: flex; justify-content: center; gap: 12px; align-items: center;
+    flex-wrap: wrap; padding: 0 16px;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 10px 18px; border-radius: 999px;
+    background: rgba(24, 18, 16, 0.42);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,224,188,0.13);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.3);
+  }
+  .pill .lbl {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .pet {
+    cursor: pointer; user-select: none; white-space: nowrap;
+    transition: all .2s ease;
+  }
+  .pet .swatch { width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,0.15); flex: none; }
+  .pet .pname { font-size: 13px; font-weight: 600; color: var(--ink); letter-spacing: .3px; }
+  .pet .pspec { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink-dim); }
+  .pet:not(.on) { opacity: .42; filter: saturate(0.3); }
+  .pet:hover { opacity: 1; border-color: rgba(255,224,188,0.3); }
+
+  #rain { width: 130px; accent-color: var(--accent); cursor: pointer; }
+  input[type="range"] { height: 4px; }
+
+  /* ---------- stats + hint ---------- */
+  #stats {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 2; padding: 8px 18px; border-radius: 999px;
+    background: rgba(20, 26, 44, 0.38);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,224,188,0.12);
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--ink-dim); white-space: nowrap;
+    opacity: 0; transition: opacity .6s;
+    pointer-events: none;
+  }
+  #stats.show { opacity: 1; }
+  #stats b { color: var(--accent); font-weight: 600; }
+  #stats.bump { animation: statBump .5s ease; }
+  @keyframes statBump {
+    0% { transform: translateX(-50%) scale(1); }
+    40% { transform: translateX(-50%) scale(1.12); }
+    100% { transform: translateX(-50%) scale(1); }
+  }
+  /* pet toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%) translateY(8px);
+    z-index: 2; padding: 8px 18px; border-radius: 999px;
+    background: rgba(24, 18, 16, 0.55);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,224,188,0.16);
+    font-size: 13px; font-weight: 600; letter-spacing: .5px; color: var(--ink);
+    opacity: 0; transition: opacity .25s ease, transform .25s ease;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast .heart { color: #ff9eb0; margin-right: 6px; }
+  #hint {
+    position: fixed; right: 22px; top: 20px; z-index: 2;
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--ink-dim); opacity: .65; text-align: right; line-height: 1.9;
+    pointer-events: none;
+  }
+  @media (max-width: 760px) { #hint { display: none; } }
+
+  @media (max-height: 720px) {
+    #watchWrap { width: 312px; height: 312px; }
+    #watch { width: 280px; height: 280px; }
+    #controls { width: 312px; }
+    .dm-dot { --dot: 6px; }
+    #controls { margin-top: 20px; gap: 12px; }
+  }
+  @media (max-height: 600px) {
+    #watchWrap { width: 246px; height: 246px; }
+    #watch { width: 222px; height: 222px; }
+    #controls { width: 246px; }
+    .dm-dot { --dot: 5px; }
+    .dm-colon { gap: 11px; }
+    #label { margin-bottom: 8px; }
+    #subline { margin-top: 8px; }
+    #controls { margin-top: 14px; gap: 10px; }
+    .chip { padding: 7px 13px; font-size: 12px; }
+    #startBtn { padding: 10px 26px; font-size: 14px; }
+    #resetBtn { padding: 10px 14px; }
+  }
+</style>
+</head>
+<body class="theme-ember">
+  <div id="sky">
+    <div id="moon"></div>
+  </div>
+  <canvas id="scene"></canvas>
+  <div id="vignette"></div>
+
+  <div id="ui">
+    <div id="watchWrap">
+      <svg id="ring" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="track" cx="50" cy="50" r="48.5"></circle>
+        <circle class="prog" cx="50" cy="50" r="48.5"></circle>
+      </svg>
+      <div id="watch">
+        <div id="label">Ready</div>
+        <div id="clock"></div>
+        <div id="subline">Focus session</div>
+      </div>
+      <div id="pulse"></div>
+    </div>
+
+    <div id="controls">
+      <div class="presets" id="presets">
+        <button class="chip" data-min="10">10 min</button>
+        <button class="chip active" data-min="30">30 min</button>
+        <button class="chip" data-min="45">45 min</button>
+        <button class="chip" data-min="60">60 min</button>
+      </div>
+      <div class="transport">
+        <button class="btn" id="startBtn">Start</button>
+        <button class="btn" id="resetBtn">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="stats"></div>
+  <div id="toast"></div>
+  <div id="hint">Click a friend to pet them<br />Tap the floor to call one over<br />Space start &middot; R reset</div>
+
+  <div id="bottom">
+    <span class="pill pet on" data-type="redpanda"><span class="swatch" style="background:#c2562a"></span><span class="pname">Miso</span><span class="pspec">red panda</span></span>
+    <span class="pill pet on" data-type="cat"><span class="swatch" style="background:#9aa3b5"></span><span class="pname">Mochi</span><span class="pspec">cat</span></span>
+    <span class="pill pet on" data-type="shiba"><span class="swatch" style="background:#d9a86c"></span><span class="pname">Hachi</span><span class="pspec">inu</span></span>
+    <span class="pill"><span class="lbl">Rain</span><input type="range" id="rain" min="0" max="100" value="45" /></span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+/* Dot-matrix countdown — Apple-StandBy style dotted digits */
+(function () {
+  // 5 wide x 7 tall bitmaps
+  const FONT = {
+    '0': ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+    '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+    '2': ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
+    '3': ['11111', '00010', '00100', '00010', '00001', '10001', '01110'],
+    '4': ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+    '5': ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+    '6': ['00110', '01000', '10000', '11110', '10001', '10001', '01110'],
+    '7': ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+    '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+    '9': ['01110', '10001', '10001', '01111', '00001', '00010', '01100']
+  };
+
+  function buildDigit(parent) {
+    const slot = document.createElement('div');
+    slot.className = 'dm-digit';
+    const dots = [];
+    for (let r = 0; r < 7; r++) {
+      for (let c = 0; c < 5; c++) {
+        const d = document.createElement('span');
+        d.className = 'dm-dot';
+        slot.appendChild(d);
+        dots.push(d);
+      }
+    }
+    parent.appendChild(slot);
+    return dots;
+  }
+
+  function buildColon(parent) {
+    const slot = document.createElement('div');
+    slot.className = 'dm-colon';
+    const top = document.createElement('span');
+    const bot = document.createElement('span');
+    top.className = 'dm-dot';
+    bot.className = 'dm-dot';
+    slot.appendChild(top);
+    slot.appendChild(bot);
+    parent.appendChild(slot);
+    return [top, bot];
+  }
+
+  function setDigit(dots, ch) {
+    const map = FONT[ch] || FONT['0'];
+    for (let r = 0; r < 7; r++) {
+      const row = map[r];
+      for (let c = 0; c < 5; c++) {
+        const i = r * 5 + c;
+        dots[i].classList.toggle('on', row[c] === '1');
+      }
+    }
+  }
+
+  function createClock(container) {
+    container.innerHTML = '';
+    const d0 = buildDigit(container);
+    const d1 = buildDigit(container);
+    const colon = buildColon(container);
+    const d2 = buildDigit(container);
+    const d3 = buildDigit(container);
+
+    return {
+      setTime(totalSeconds) {
+        totalSeconds = Math.max(0, Math.round(totalSeconds));
+        const m = Math.min(99, Math.floor(totalSeconds / 60));
+        const s = totalSeconds % 60;
+        const mm = String(m).padStart(2, '0');
+        const ss = String(s).padStart(2, '0');
+        setDigit(d0, mm[0]);
+        setDigit(d1, mm[1]);
+        setDigit(d2, ss[0]);
+        setDigit(d3, ss[1]);
+      },
+      setColon(on) {
+        colon[0].classList.toggle('on', on);
+        colon[1].classList.toggle('on', on);
+      }
+    };
+  }
+
+  window.DotMatrix = { createClock };
+})();
+
+  </script>
+  <script>
+/* Low-poly 3D study animals: red panda, cat, shiba — built from faceted primitives */
+(function () {
+  const T = window.THREE;
+
+  function mat(color, rough) {
+    return new T.MeshStandardMaterial({
+      color: color,
+      flatShading: true,
+      roughness: rough == null ? 0.85 : rough,
+      metalness: 0.0
+    });
+  }
+
+  // faceted ellipsoid
+  function blob(rx, ry, rz, color, rough) {
+    const g = new T.SphereGeometry(1, 7, 5);
+    const m = new T.Mesh(g, mat(color, rough));
+    m.scale.set(rx, ry, rz);
+    return m;
+  }
+  function ico(r, color) {
+    return new T.Mesh(new T.IcosahedronGeometry(r, 0), mat(color));
+  }
+  function box(w, h, d, color) {
+    return new T.Mesh(new T.BoxGeometry(w, h, d), mat(color));
+  }
+  function cone(r, h, color, seg) {
+    return new T.Mesh(new T.ConeGeometry(r, h, seg || 4), mat(color));
+  }
+  function cyl(rt, rb, h, color, seg) {
+    return new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 6), mat(color));
+  }
+
+  // soft round contact shadow texture
+  let shadowTex = null;
+  function getShadowTex() {
+    if (shadowTex) return shadowTex;
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+    g.addColorStop(0, 'rgba(0,0,0,0.55)');
+    g.addColorStop(0.6, 'rgba(0,0,0,0.22)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    shadowTex = new T.CanvasTexture(c);
+    return shadowTex;
+  }
+
+  // Zzz text sprite
+  let zTex = null;
+  function getZTex() {
+    if (zTex) return zTex;
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.font = 'bold 44px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(240, 236, 255, 0.95)';
+    ctx.fillText('z', 32, 34);
+    zTex = new T.CanvasTexture(c);
+    return zTex;
+  }
+
+  function makeShadow(radius) {
+    const m = new T.Mesh(
+      new T.PlaneGeometry(radius * 2, radius * 2),
+      new T.MeshBasicMaterial({ map: getShadowTex(), transparent: true, depthWrite: false, opacity: 0.5 })
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = 0.02;
+    return m;
+  }
+
+  // build a leg, pivoting from the hip (top)
+  function makeLeg(color, len, thick) {
+    const pivot = new T.Group();
+    const l = cyl(thick * 0.8, thick, len, color, 5);
+    l.position.y = -len / 2;
+    pivot.add(l);
+    // paw
+    const paw = blob(thick * 1.1, thick * 0.7, thick * 1.3, color);
+    paw.position.y = -len;
+    pivot.add(paw);
+    pivot.userData.len = len;
+    return pivot;
+  }
+
+  // ---- Animal definitions ----
+  const DEFS = {
+    redpanda: {
+      bodyColor: 0xb9531f, faceColor: 0xf2e4cf, darkColor: 0x2a1a12,
+      bodyR: [0.55, 0.5, 0.78], headR: 0.5, legLen: 0.42, legThick: 0.13,
+      eyeY: 0.08, scale: 0.62,
+      speedR: [0.8, 1.1], gaitBob: 0.06, walkSway: 0.13, tailAmp: 1,
+      specials: ['rear'],
+      build(parts, color) {
+        // cream face overlay
+        const face = blob(0.42, 0.4, 0.32, color.faceColor);
+        face.position.set(0, parts.headY, 0.28);
+        parts.pose.add(face);
+        // rust mask patches around eyes
+        for (const sx of [-1, 1]) {
+          const patch = blob(0.12, 0.16, 0.08, color.bodyColor);
+          patch.position.set(sx * 0.18, parts.headY + 0.02, 0.5);
+          parts.pose.add(patch);
+        }
+        // ears — rounded, rust w/ cream inner
+        for (const sx of [-1, 1]) {
+          const ear = blob(0.16, 0.16, 0.07, color.bodyColor);
+          ear.position.set(sx * 0.34, parts.headY + 0.42, 0.02);
+          const inner = blob(0.09, 0.09, 0.05, color.faceColor);
+          inner.position.set(sx * 0.34, parts.headY + 0.42, 0.06);
+          parts.pose.add(ear); parts.pose.add(inner);
+          parts.ears.push(ear); parts.ears.push(inner);
+        }
+        // ringed tail — chain of alternating spheres, curving up
+        const tail = new T.Group();
+        let py = 0, pz = -0.7, ang = 0;
+        for (let i = 0; i < 6; i++) {
+          const c = i % 2 === 0 ? color.bodyColor : color.darkColor;
+          const seg = blob(0.17 - i * 0.012, 0.17 - i * 0.012, 0.17 - i * 0.012, c);
+          ang += 0.28;
+          pz -= 0.2 * Math.cos(ang);
+          py += 0.2 * Math.sin(ang) + 0.04;
+          seg.position.set(0, py, pz);
+          tail.add(seg);
+        }
+        tail.position.set(0, parts.bodyY, -0.1);
+        parts.pose.add(tail);
+        parts.tail = tail;
+        // little dark snout tip
+        const nose = blob(0.06, 0.05, 0.05, color.darkColor);
+        nose.position.set(0, parts.headY - 0.04, 0.6);
+        parts.pose.add(nose);
+      }
+    },
+    cat: {
+      bodyColor: 0x8b94a6, faceColor: 0xe7ebf2, darkColor: 0x4a5161,
+      bodyR: [0.42, 0.42, 0.7], headR: 0.42, legLen: 0.5, legThick: 0.1,
+      eyeY: 0.05, scale: 0.6,
+      speedR: [1.0, 1.4], gaitBob: 0.035, walkSway: 0.03, tailAmp: 0.8,
+      specials: ['pounce', 'groom'],
+      build(parts, color) {
+        // white muzzle + chest + socks
+        const muzzle = blob(0.22, 0.18, 0.18, color.faceColor);
+        muzzle.position.set(0, parts.headY - 0.1, 0.34);
+        parts.pose.add(muzzle);
+        const chest = blob(0.24, 0.34, 0.26, color.faceColor);
+        chest.position.set(0, parts.bodyY - 0.04, 0.4);
+        parts.pose.add(chest);
+        // triangular ears, grey with pink inner
+        for (const sx of [-1, 1]) {
+          const ear = cone(0.17, 0.34, color.bodyColor, 4);
+          ear.position.set(sx * 0.22, parts.headY + 0.42, 0);
+          ear.rotation.z = sx * 0.1;
+          const inner = cone(0.09, 0.2, 0xd98aa0, 4);
+          inner.position.set(sx * 0.22, parts.headY + 0.4, 0.05);
+          inner.rotation.z = sx * 0.1;
+          parts.pose.add(ear); parts.pose.add(inner);
+          parts.ears.push(ear);
+        }
+        // long thin tail curving up, grey with dark tip
+        const tail = new T.Group();
+        let py = 0.0, pz = -0.62, ang = 0;
+        for (let i = 0; i < 7; i++) {
+          const c = i >= 5 ? color.darkColor : color.bodyColor;
+          const seg = blob(0.1 - i * 0.006, 0.1 - i * 0.006, 0.1 - i * 0.006, c);
+          ang += 0.34;
+          pz -= 0.13 * Math.cos(ang);
+          py += 0.17 * Math.sin(ang) + 0.05;
+          seg.position.set(0, py, pz);
+          tail.add(seg);
+        }
+        tail.position.set(0, parts.bodyY, -0.05);
+        parts.pose.add(tail);
+        parts.tail = tail;
+        const nose = blob(0.05, 0.04, 0.04, 0xd98aa0);
+        nose.position.set(0, parts.headY - 0.08, 0.54);
+        parts.pose.add(nose);
+      }
+    },
+    shiba: {
+      bodyColor: 0xd49a5a, faceColor: 0xf3ead8, darkColor: 0x6b4a2a,
+      bodyR: [0.5, 0.48, 0.74], headR: 0.46, legLen: 0.46, legThick: 0.12,
+      eyeY: 0.06, scale: 0.62,
+      speedR: [1.4, 1.8], gaitBob: 0.11, walkSway: 0.06, tailAmp: 1.8,
+      specials: ['zoomie', 'shake'],
+      build(parts, color) {
+        // cream cheeks + muzzle + chest
+        const muzzle = blob(0.26, 0.2, 0.2, color.faceColor);
+        muzzle.position.set(0, parts.headY - 0.1, 0.36);
+        parts.pose.add(muzzle);
+        for (const sx of [-1, 1]) {
+          const cheek = blob(0.18, 0.18, 0.14, color.faceColor);
+          cheek.position.set(sx * 0.26, parts.headY - 0.06, 0.18);
+          parts.pose.add(cheek);
+        }
+        const chest = blob(0.3, 0.36, 0.26, color.faceColor);
+        chest.position.set(0, parts.bodyY - 0.06, 0.42);
+        parts.pose.add(chest);
+        // pointy triangular ears, tan
+        for (const sx of [-1, 1]) {
+          const ear = cone(0.16, 0.3, color.bodyColor, 4);
+          ear.position.set(sx * 0.26, parts.headY + 0.38, 0.02);
+          ear.rotation.z = sx * 0.18;
+          parts.pose.add(ear);
+          parts.ears.push(ear);
+        }
+        // curled tail — fan of segments curving up over back
+        const tail = new T.Group();
+        let py = 0.1, pz = -0.6, ang = -0.2;
+        for (let i = 0; i < 5; i++) {
+          const seg = blob(0.2 - i * 0.02, 0.2 - i * 0.02, 0.2 - i * 0.02,
+            i % 2 ? color.faceColor : color.bodyColor);
+          ang += 0.5;
+          pz += 0.16 * Math.cos(ang);
+          py += 0.18 * Math.sin(ang) + 0.05;
+          seg.position.set(0, py, pz);
+          tail.add(seg);
+        }
+        tail.position.set(0, parts.bodyY + 0.1, -0.1);
+        parts.pose.add(tail);
+        parts.tail = tail;
+        const nose = blob(0.06, 0.05, 0.05, color.darkColor);
+        nose.position.set(0, parts.headY - 0.12, 0.55);
+        parts.pose.add(nose);
+      }
+    }
+  };
+
+  function buildAnimal(type) {
+    const def = DEFS[type];
+    const group = new T.Group();
+    const pose = new T.Group(); // handles bob / sit tilt
+    group.add(pose);
+
+    const parts = { pose: pose, ears: [], legs: [], tail: null, eyes: [] };
+    parts.bodyY = def.legLen + 0.45;
+    parts.headY = parts.bodyY + 0.5;
+
+    // body
+    const body = blob(def.bodyR[0], def.bodyR[1], def.bodyR[2], def.bodyColor);
+    body.position.set(0, parts.bodyY, 0);
+    body.rotation.x = -0.08;
+    pose.add(body);
+
+    // head
+    const head = ico(def.headR, def.bodyColor);
+    head.position.set(0, parts.headY, 0.3);
+    pose.add(head);
+    parts.head = head;
+
+    // eyes
+    for (const sx of [-1, 1]) {
+      const eye = new T.Mesh(new T.SphereGeometry(0.07, 8, 8), mat(0x14100c, 0.4));
+      eye.position.set(sx * 0.2, parts.headY + def.eyeY, 0.58);
+      pose.add(eye);
+      parts.eyes.push(eye);
+      const glint = new T.Mesh(new T.SphereGeometry(0.025, 6, 6),
+        new T.MeshBasicMaterial({ color: 0xfff2dc }));
+      glint.position.set(sx * 0.2 + 0.02, parts.headY + def.eyeY + 0.03, 0.63);
+      pose.add(glint);
+      eye.userData.glint = glint;
+    }
+
+    // legs (diagonal gait pairs)
+    const hipX = def.bodyR[0] * 0.7;
+    const hipZ = def.bodyR[2] * 0.62;
+    const legPos = [
+      [hipX, hipZ], [-hipX, hipZ], [hipX, -hipZ], [-hipX, -hipZ]
+    ];
+    for (const [lx, lz] of legPos) {
+      const leg = makeLeg(def.darkColor === 0x2a1a12 ? def.darkColor : def.bodyColor, def.legLen, def.legThick);
+      leg.position.set(lx, def.legLen + 0.1, lz);
+      pose.add(leg);
+      parts.legs.push(leg);
+    }
+
+    // animal-specific extras
+    const color = {
+      bodyColor: def.bodyColor, faceColor: def.faceColor, darkColor: def.darkColor
+    };
+    def.build(parts, color);
+
+    group.scale.setScalar(def.scale);
+    const shadow = makeShadow(0.85 * def.scale);
+    group.add(shadow);
+    parts.shadow = shadow;
+
+    // wet-floor reflection: faint colored glow pooled under the body
+    const sheen = new T.Mesh(
+      new T.PlaneGeometry(2.2, 1.4),
+      new T.MeshBasicMaterial({
+        map: getShadowTex(), transparent: true, depthWrite: false,
+        color: def.bodyColor, opacity: 0.16, blending: T.AdditiveBlending
+      })
+    );
+    sheen.rotation.x = -Math.PI / 2;
+    sheen.position.y = 0.01;
+    group.add(sheen);
+
+    // Zzz sprites for sleeping (hidden by default)
+    parts.zzz = [];
+    for (let i = 0; i < 3; i++) {
+      const z = new T.Sprite(new T.SpriteMaterial({
+        map: getZTex(), transparent: true, opacity: 0, depthWrite: false
+      }));
+      const s = 0.22 + i * 0.08;
+      z.scale.set(s, s, 1);
+      z.userData.i = i;
+      group.add(z);
+      parts.zzz.push(z);
+    }
+
+    return { group, pose, parts, type, def };
+  }
+
+  // ---- Behavior ----
+  const BOUNDS = { xMin: -7, xMax: 7, zMin: -1.2, zMax: 3.6 };
+
+  class Critter {
+    constructor(type) {
+      const a = buildAnimal(type);
+      this.type = type;
+      this.group = a.group;
+      this.pose = a.pose;
+      this.parts = a.parts;
+      this.def = a.def;
+
+      this.pos = new T.Vector2(
+        rand(BOUNDS.xMin + 1, BOUNDS.xMax - 1),
+        rand(BOUNDS.zMin, BOUNDS.zMax)
+      );
+      this.target = this.pos.clone();
+      this.heading = rand(-Math.PI, Math.PI);
+      this.phase = Math.random() * 10;
+      this.state = 'walk';
+      this.restTimer = 0;
+      this.speed = rand(this.def.speedR[0], this.def.speedR[1]);
+      this.special = null;
+      this.specialT = 0;
+      this.bob = 0;
+      this.sitAmt = 0;       // 0..1 how much sitting/lying
+      this.earPerk = 0;      // 0..1
+      this.celebT = 0;
+      this.spin = 0;
+      this.blinkT = rand(2, 6);
+      this.petT = 0;
+      this.speedMul = 1;
+      this.zT = Math.random() * 3;
+      this.celebSpot = null;
+      this.active = true;
+      this.opacity = 1;
+      this.group.position.set(this.pos.x, 0, this.pos.y);
+      this.pickTarget('idle');
+    }
+
+    setActive(on) {
+      this.active = on;
+      this.group.visible = on;
+    }
+
+    pickTarget(mode) {
+      if (mode === 'focus') {
+        // gather loosely around the campfire
+        const F = window.Critters.FIRE || { x: 0, z: 0 };
+        const ang = rand(-Math.PI, Math.PI);
+        const r = rand(1.8, 3.2);
+        let x = F.x + Math.cos(ang) * r;
+        let z = F.z + 0.8 + Math.sin(ang) * r * 0.6;
+        x = clamp(x, BOUNDS.xMin + 0.5, BOUNDS.xMax - 0.5);
+        z = clamp(z, BOUNDS.zMin, BOUNDS.zMax);
+        this.target.set(x, z);
+      } else {
+        this.target.set(
+          rand(BOUNDS.xMin + 0.5, BOUNDS.xMax - 0.5),
+          rand(BOUNDS.zMin, BOUNDS.zMax)
+        );
+      }
+    }
+
+    perk() { this.earPerk = 1; this.bobBoost = 1; }
+
+    pet() {
+      this.petT = 0.9;
+      this.earPerk = 1;
+      // wake up if sleeping
+      if (this.state === 'sleep') { this.state = 'idle'; this.restTimer = rand(1.5, 3); }
+    }
+
+    callTo(x, z) {
+      this.target.set(x, z);
+      this.state = 'walk';
+      this.earPerk = 1;
+    }
+
+    update(dt, env) {
+      if (!this.active) return;
+      const mode = env.mode;
+
+      // celebrate overrides
+      if (mode === 'celebrate') {
+        this.celebrate(dt);
+        this.applyPose(dt);
+        return;
+      } else {
+        this.celebT = 0;
+        this.celebSpot = null;
+        this.spin *= Math.pow(0.001, dt);
+      }
+
+      // decay perk
+      this.earPerk = Math.max(0, this.earPerk - dt * 0.6);
+
+      if (this.state === 'walk') {
+        const dx = this.target.x - this.pos.x;
+        const dz = this.target.y - this.pos.y;
+        const dist = Math.hypot(dx, dz);
+        if (dist < 0.25) {
+          // arrived -> choose a rest
+          this.beginRest(mode);
+        } else {
+          const spd = this.speed * this.speedMul;
+          const step = Math.min(dist, spd * dt);
+          const nx = dx / dist, nz = dz / dist;
+          this.pos.x += nx * step;
+          this.pos.y += nz * step;
+          // face heading
+          const desired = Math.atan2(nx, nz);
+          this.heading = lerpAngle(this.heading, desired, Math.min(1, dt * 6));
+          this.phase += dt * spd * 5.2;
+          this.walking = true;
+        }
+      } else {
+        // resting / performing a special move
+        this.walking = false;
+        this.restTimer -= dt;
+        // settle to face the fire while warming up
+        if (this.warmHeading != null) {
+          this.heading = lerpAngle(this.heading, this.warmHeading, Math.min(1, dt * 3));
+          if (this.restTimer <= 0) this.warmHeading = null;
+        }
+        if (this.state === 'special') {
+          this.specialT += dt;
+          this.updateSpecial(dt);
+        }
+        if (this.restTimer <= 0) {
+          this.special = null;
+          this.pickTarget(mode);
+          this.state = 'walk';
+        }
+      }
+
+      // sit amount target depends on state
+      let sitTarget = 0;
+      if (this.state === 'sit') sitTarget = 0.5;
+      else if (this.state === 'sleep') sitTarget = 1.0;
+      this.sitAmt = lerp(this.sitAmt, sitTarget, Math.min(1, dt * 3));
+
+      this.applyTransform();
+      this.applyPose(dt);
+    }
+
+    beginRest(mode) {
+      // arrived to warm up by the fire: sit facing the flames
+      if (this.warmPending) {
+        this.warmPending = false;
+        const F = window.Critters.FIRE;
+        if (F) {
+          this.state = Math.random() < 0.35 ? 'sleep' : 'sit';
+          this.restTimer = rand(6, 12);
+          this.warmHeading = Math.atan2(F.x - this.pos.x, F.z - this.pos.y);
+          return;
+        }
+      }
+      // sometimes wander over to the fire instead of resting here
+      const F = window.Critters.FIRE;
+      if (F && !this.warmPending && Math.random() < 0.2) {
+        const a = rand(-Math.PI, Math.PI);
+        const r = rand(1.3, 2.0);
+        const tx = clamp(F.x + Math.cos(a) * r, BOUNDS.xMin + 0.5, BOUNDS.xMax - 0.5);
+        const tz = clamp(F.z + Math.sin(a) * r, BOUNDS.zMin + 0.1, BOUNDS.zMax);
+        this.target.set(tx, tz);
+        this.state = 'walk';
+        this.warmPending = true;
+        return;
+      }
+      // chance to perform this animal's signature move
+      const sp = this.def.specials || [];
+      if (sp.length && Math.random() < (mode === 'focus' ? 0.18 : 0.42)) {
+        this.state = 'special';
+        this.special = sp[Math.floor(Math.random() * sp.length)];
+        this.specialT = 0;
+        this.restTimer = { rear: 3.2, groom: 3.6, pounce: 1.35, zoomie: 3.4, shake: 1.0 }[this.special] || 2;
+        return;
+      }
+      const roll = Math.random();
+      // in focus mode, calmer (more sit/sleep)
+      if (mode === 'focus') {
+        if (roll < 0.45) this.state = 'sit';
+        else if (roll < 0.7) this.state = 'sleep';
+        else this.state = 'idle';
+        this.restTimer = rand(3.5, 7);
+      } else {
+        if (roll < 0.3) this.state = 'sit';
+        else if (roll < 0.42) this.state = 'sleep';
+        else this.state = 'idle';
+        this.restTimer = rand(1.6, 4.5);
+      }
+    }
+
+    // signature move motion (position-level)
+    updateSpecial(dt) {
+      const s = this.special;
+      const B = BOUNDS;
+      if (s === 'zoomie') {
+        // gleeful circular sprint
+        this.heading += 2.6 * dt;
+        if (this.pos.x < B.xMin + 1 || this.pos.x > B.xMax - 1 ||
+            this.pos.y < B.zMin + 0.4 || this.pos.y > B.zMax - 0.4) {
+          const toC = Math.atan2(-this.pos.x, 1.2 - this.pos.y);
+          this.heading = lerpAngle(this.heading, toC, Math.min(1, dt * 5));
+        }
+        const spd = 3.6 * this.speedMul;
+        this.pos.x += Math.sin(this.heading) * spd * dt;
+        this.pos.y += Math.cos(this.heading) * spd * dt;
+        this.pos.x = clamp(this.pos.x, B.xMin, B.xMax);
+        this.pos.y = clamp(this.pos.y, B.zMin, B.zMax);
+        this.phase += dt * 13;
+        this.walking = true;
+        this.bob = Math.abs(Math.sin(this.phase)) * 0.17;
+      } else if (s === 'pounce') {
+        // crouch + butt wiggle, then spring forward
+        if (this.specialT >= 0.75 && this.specialT < 1.1) {
+          const lt = (this.specialT - 0.75) / 0.35;
+          const spd = 4.4;
+          this.pos.x += Math.sin(this.heading) * spd * dt;
+          this.pos.y += Math.cos(this.heading) * spd * dt;
+          this.pos.x = clamp(this.pos.x, B.xMin, B.xMax);
+          this.pos.y = clamp(this.pos.y, B.zMin, B.zMax);
+          this.bob = Math.sin(lt * Math.PI) * 0.5;
+        }
+      }
+      this.group.position.set(this.pos.x, 0, this.pos.y);
+      this.group.rotation.y = this.heading;
+    }
+
+    celebrate(dt) {
+      this.celebT += dt;
+      this.earPerk = 1;
+      this.sitAmt = 0;
+      // pick a party spot near the campfire once
+      if (!this.celebSpot) {
+        const F = window.Critters.FIRE || { x: 0, z: 0 };
+        const ang = rand(-Math.PI * 0.85, Math.PI * 0.85);
+        this.celebSpot = {
+          x: clamp(F.x + Math.cos(ang) * rand(1.6, 2.4), BOUNDS.xMin + 0.5, BOUNDS.xMax - 0.5),
+          z: clamp(F.z + 1.0 + Math.sin(ang) * rand(0.8, 1.4), BOUNDS.zMin, BOUNDS.zMax)
+        };
+      }
+      const dx = this.celebSpot.x - this.pos.x;
+      const dz = this.celebSpot.z - this.pos.y;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 0.35) {
+        // sprint to the watch
+        const spd = this.speed * this.speedMul * 2.1;
+        const step = Math.min(dist, spd * dt);
+        this.pos.x += dx / dist * step;
+        this.pos.y += dz / dist * step;
+        const desired = Math.atan2(dx / dist, dz / dist);
+        this.heading = lerpAngle(this.heading, desired, Math.min(1, dt * 8));
+        this.phase += dt * spd * 5.2;
+        this.walking = true;
+        this.bob = Math.abs(Math.sin(this.phase)) * 0.1;
+        this.group.position.set(this.pos.x, 0, this.pos.y);
+        this.group.rotation.y = this.heading;
+      } else {
+        // party: hop + spin facing the watch
+        this.walking = false;
+        this.phase += dt * 4;
+        this.heading += 5.5 * dt;
+        this.bob = Math.abs(Math.sin(this.celebT * 7)) * 0.5;
+        this.group.position.set(this.pos.x, 0, this.pos.y);
+        this.group.rotation.y = this.heading;
+      }
+    }
+
+    applyTransform() {
+      this.group.position.set(this.pos.x, 0, this.pos.y);
+      this.group.rotation.y = this.heading;
+      // walking bob (specials manage their own bounce)
+      if (!(this.state === 'special' && (this.special === 'zoomie' || this.special === 'pounce'))) {
+        const targetBob = this.walking ? Math.abs(Math.sin(this.phase)) * (this.def.gaitBob || 0.07) : 0;
+        this.bob = lerp(this.bob, targetBob, Math.min(1, 0.2));
+      }
+    }
+
+    applyPose(dt) {
+      const p = this.parts;
+      // pet hop: a happy little jump
+      if (this.petT > 0) {
+        this.petT -= dt;
+        const t = 1 - Math.max(0, this.petT) / 0.9;
+        this.bob = Math.max(this.bob, Math.sin(Math.min(1, t * 2) * Math.PI) * 0.42);
+      }
+      // special-move ease (in + out)
+      let spK = 0;
+      if (this.state === 'special') {
+        spK = Math.min(Math.min(1, this.specialT * 2.5), Math.min(1, Math.max(0, this.restTimer) * 2.5));
+      }
+
+      // body height + tilt (sit crouch, rear-up, pounce crouch)
+      let rotX = -this.sitAmt * 0.22;
+      let posY = this.bob - this.sitAmt * 0.22;
+      if (this.special === 'rear') { rotX = -0.85 * spK; posY += 0.2 * spK; }
+      if (this.special === 'groom') { rotX = -0.08 * spK; posY -= 0.08 * spK; }
+      if (this.special === 'pounce' && this.specialT < 0.75) { rotX = 0.16 * spK; posY -= 0.13 * spK; }
+      this.pose.position.y = posY;
+      this.pose.rotation.x = lerp(this.pose.rotation.x, rotX, Math.min(1, dt * 5));
+
+      // body roll: waddle sway while walking, shiba shake, cat butt-wiggle
+      let rotZ = this.walking ? Math.sin(this.phase) * (this.def.walkSway || 0.05) : 0;
+      if (this.special === 'shake') rotZ = Math.sin(this.specialT * 40) * 0.3 * spK;
+      if (this.special === 'pounce' && this.specialT < 0.75) rotZ = Math.sin(this.specialT * 16) * 0.07;
+      this.pose.rotation.z = lerp(this.pose.rotation.z, rotZ, Math.min(1, dt * 12));
+
+      // legs
+      const amp = this.walking ? 0.7 : 0.0;
+      const legs = p.legs;
+      if (legs.length === 4) {
+        // diagonal gait: legs[0]=FR,1=FL,2=BR,3=BL  (pos order: FR,FL,BR,BL)
+        const a = Math.sin(this.phase);
+        const b = Math.sin(this.phase + Math.PI);
+        legs[0].rotation.x = a * amp;
+        legs[3].rotation.x = a * amp;
+        legs[1].rotation.x = b * amp;
+        legs[2].rotation.x = b * amp;
+        // when sitting, fold back legs / lower
+        const fold = this.sitAmt;
+        legs[2].rotation.x = lerp(legs[2].rotation.x, 1.1, fold);
+        legs[3].rotation.x = lerp(legs[3].rotation.x, 1.1, fold);
+        // rear-up: front paws lift
+        if (this.special === 'rear') {
+          legs[0].rotation.x = lerp(legs[0].rotation.x, -1.25 * spK, Math.min(1, dt * 5));
+          legs[1].rotation.x = lerp(legs[1].rotation.x, -1.05 * spK, Math.min(1, dt * 5));
+        }
+      }
+
+      // ears perk
+      const perk = this.earPerk;
+      for (const ear of p.ears) {
+        if (ear.userData.baseRotZ == null) ear.userData.baseRotZ = ear.rotation.z;
+        ear.rotation.x = lerp(ear.rotation.x, -perk * 0.3, Math.min(1, dt * 6));
+      }
+
+      // tail sway / wag
+      if (p.tail) {
+        const wag = this.state === 'celebrate' || this.celebT > 0 ? 6 : (this.walking ? 3 : 1.2);
+        const tamp = (this.celebT > 0 ? 0.5 : 0.18) * (this.def.tailAmp || 1);
+        p.tail.rotation.y = Math.sin(this.phase * wag * 0.4) * tamp;
+        p.tail.rotation.x = lerp(p.tail.rotation.x, -this.sitAmt * 0.3, Math.min(1, dt * 4));
+      }
+
+      // sleeping Zzz
+      const sleeping = this.state === 'sleep' && this.sitAmt > 0.7;
+      this.zT += dt;
+      for (const z of p.zzz) {
+        const cycle = 2.4;
+        const t = ((this.zT + z.userData.i * 0.8) % cycle) / cycle;
+        if (sleeping) {
+          z.material.opacity = Math.sin(t * Math.PI) * 0.8;
+          z.position.set(
+            0.35 + t * 0.3 + z.userData.i * 0.1,
+            (this.parts.headY || 1.2) + 0.3 + t * 0.8,
+            0.2
+          );
+        } else {
+          z.material.opacity = Math.max(0, z.material.opacity - dt * 3);
+        }
+      }
+
+      // eye blinks + closed eyes while sleeping
+      this.blinkT -= dt;
+      if (this.blinkT <= 0) this.blinkT = rand(2.5, 6.5);
+      const closed = sleeping || this.blinkT < 0.12;
+      for (const eye of p.eyes) {
+        eye.scale.y = lerp(eye.scale.y, closed ? 0.12 : 1, Math.min(1, dt * 18));
+        if (eye.userData.glint) eye.userData.glint.visible = !closed;
+      }
+
+      // head gentle look (groom: head tucked down, bobbing)
+      if (p.head) {
+        let headX;
+        if (this.special === 'groom') {
+          headX = (0.55 + Math.sin(this.specialT * 7) * 0.12) * spK;
+        } else {
+          const lookUp = this.earPerk * 0.15 + (this.sitAmt > 0.7 ? -0.1 : 0);
+          headX = -lookUp;
+          if (this.special === 'rear') headX = -0.35 * spK;
+        }
+        p.head.rotation.x = lerp(p.head.rotation.x, headX, Math.min(1, dt * 4));
+      }
+    }
+  }
+
+  // helpers
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpAngle(a, b, t) {
+    let d = b - a;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return a + d * t;
+  }
+
+  window.Critters = { Critter, BOUNDS };
+})();
+
+  </script>
+  <script>
+/* Scene: dusk void, mist, rain, camera, render loop + public Watch API */
+(function () {
+  const T = window.THREE;
+  let renderer, scene, camera, clock;
+  let critters = {};
+  let rainObj, rainData, rainMax = 1600, rainLevel = 0.45;
+  let ripples = [], mists = [], burst = [], dustPts = null, dustData = [];
+  let freeCam = false, mouseX = 0, mouseY = 0, elapsed = 0;
+  let lights = {}, glowSprite = null, moonSprite = null, starPts = [];
+  let hearts = [], driftOn = true, mistLevel = 0.5, theme = 'dusk';
+  let flames = [], fireLight = null, emberPts = null, emberData = [], clouds = [];
+  let smoke = [], smokeTimer = 0, stoke = 0;
+  let marshSticks = [];
+  let treeGroups = [];
+  let gust = 0, gustTarget = 0, gustTimer = 5, windSlant = 0.12;
+  let shootTimer = 22, shoots = [];
+
+  const THEMES = {
+    dusk: {
+      fog: 0x1a2236, hemiSky: 0x7a8fc8, hemiGround: 0x3a2417,
+      dir: 0xffd6a0, warm: 0xff9a4d, rim: 0x4d6bd0, amb: 0x2a3450,
+      glow: 0xff9a4d, rain: 0xb9cdf0, dust: 0xffc488,
+      moon: 0xe8edff, moonOpacity: 0.5, mist: 0x8fa3d8
+    },
+    midnight: {
+      fog: 0x0e1526, hemiSky: 0x5a74c0, hemiGround: 0x1c2236,
+      dir: 0xaec4ff, warm: 0x7fa0e8, rim: 0x3d5ac0, amb: 0x202c4a,
+      glow: 0x6f8fe0, rain: 0xa8c0ec, dust: 0xaac4ff,
+      moon: 0xf2f5ff, moonOpacity: 0.85, mist: 0x7288c2
+    },
+    ember: {
+      fog: 0x1f1714, hemiSky: 0x9a6a58, hemiGround: 0x401f10,
+      dir: 0xffc080, warm: 0xff7a30, rim: 0x8a4a40, amb: 0x3a2620,
+      glow: 0xff8038, rain: 0xe0bfa8, dust: 0xffb070,
+      moon: 0xffd8b0, moonOpacity: 0.4, mist: 0xb08068
+    }
+  };
+  let mode = 'idle';            // 'idle' | 'focus' | 'celebrate'
+  let celebrateUntil = 0;
+  let watchPulse = 0;
+
+  const env = { mode: 'idle' };
+
+  function init(canvas) {
+    renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    scene = new T.Scene();
+    scene.fog = new T.FogExp2(0x1a2236, 0.045);
+
+    camera = new T.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 4.6, 9.4);
+    camera.lookAt(0, 1.3, 0);
+
+    // ---- lights (cozy dusk) ----
+    lights.hemi = new T.HemisphereLight(0x7a8fc8, 0x3a2417, 0.6);
+    scene.add(lights.hemi);
+    lights.dir = new T.DirectionalLight(0xffd6a0, 1.05);
+    lights.dir.position.set(5, 8, 4);
+    scene.add(lights.dir);
+    lights.warm = new T.PointLight(0xff9a4d, 0.45, 26, 2);
+    lights.warm.position.set(0, 2.4, 5.5);
+    scene.add(lights.warm);
+    lights.rim = new T.DirectionalLight(0x4d6bd0, 0.5);
+    lights.rim.position.set(-4, 3, -5);
+    scene.add(lights.rim);
+    lights.amb = new T.AmbientLight(0x2a3450, 0.35);
+    scene.add(lights.amb);
+
+    // a faint warm glow disc low-center to anchor the void
+    const glowTex = makeGlowTex();
+    glowSprite = new T.Sprite(new T.SpriteMaterial({
+      map: glowTex, color: 0xff9a4d, transparent: true, opacity: 0.5,
+      depthWrite: false, blending: T.AdditiveBlending
+    }));
+    glowSprite.scale.set(10, 4.5, 1);
+    glowSprite.position.set(0, 0.3, -3);
+    glowSprite.material.opacity = 0.32;
+    scene.add(glowSprite);
+
+    // moon + halo, high left so it peeks around the watch
+    moonSprite = new T.Group();
+    const moonCore = new T.Sprite(new T.SpriteMaterial({
+      map: glowTex, color: 0xe8edff, transparent: true, opacity: 0.9,
+      depthWrite: false, blending: T.AdditiveBlending
+    }));
+    moonCore.scale.set(1.6, 1.6, 1);
+    const moonHalo = new T.Sprite(new T.SpriteMaterial({
+      map: glowTex, color: 0xbcd0ff, transparent: true, opacity: 0.22,
+      depthWrite: false, blending: T.AdditiveBlending
+    }));
+    moonHalo.scale.set(6, 6, 1);
+    moonSprite.add(moonHalo);
+    moonSprite.add(moonCore);
+    moonSprite.position.set(-8.5, 9.5, -14);
+    scene.add(moonSprite);
+
+    // twinkling stars: two layers blinking in counter-phase
+    for (let layer = 0; layer < 2; layer++) {
+      const n = 70;
+      const geo = new T.BufferGeometry();
+      const pos = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        pos[i * 3] = rand(-30, 30);
+        pos[i * 3 + 1] = rand(4, 18);
+        pos[i * 3 + 2] = rand(-22, -12);
+      }
+      geo.setAttribute('position', new T.BufferAttribute(pos, 3));
+      const pts = new T.Points(geo, new T.PointsMaterial({
+        color: 0xdfe6ff, size: 0.07, transparent: true, opacity: 0.6,
+        depthWrite: false, sizeAttenuation: true
+      }));
+      pts.frustumCulled = false;
+      scene.add(pts);
+      starPts.push(pts);
+    }
+
+    // ---- animals ----
+    ['redpanda', 'cat', 'shiba'].forEach(type => {
+      const c = new window.Critters.Critter(type);
+      critters[type] = c;
+      scene.add(c.group);
+    });
+
+    // ---- rain + atmosphere ----
+    buildRain();
+    buildRipples();
+    buildMist();
+    buildDust();
+    buildEnvironment();
+    buildFire();
+    buildCampsite();
+
+    window.addEventListener('mousemove', (e) => {
+      mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+    });
+
+    // ---- click interactions: pet an animal, or call one over ----
+    const raycaster = new T.Raycaster();
+    const ndc = new T.Vector2();
+    const groundPlane = new T.Plane(new T.Vector3(0, 1, 0), 0);
+    canvas.addEventListener('pointermove', (e) => {
+      ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      let over = false;
+      for (const k in critters) {
+        if (!critters[k].active) continue;
+        if (raycaster.intersectObject(critters[k].group, true).length) { over = true; break; }
+      }
+      canvas.style.cursor = over ? 'pointer' : 'default';
+    });
+    canvas.addEventListener('pointerdown', (e) => {
+      ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      // hit an animal?
+      for (const k in critters) {
+        const c = critters[k];
+        if (!c.active) continue;
+        const hits = raycaster.intersectObject(c.group, true);
+        if (hits.length) {
+          c.pet();
+          spawnHearts(c.group.position.x, c.group.position.z, c.def.bodyColor);
+          if (window.Watch.onPet) window.Watch.onPet(k);
+          return;
+        }
+      }
+      // otherwise: tap the floor to call the nearest friend
+      const pt = new T.Vector3();
+      if (raycaster.ray.intersectPlane(groundPlane, pt)) {
+        const B = window.Critters.BOUNDS;
+        if (pt.x > B.xMin && pt.x < B.xMax && pt.z > B.zMin - 1 && pt.z < B.zMax + 1) {
+          const x = Math.max(B.xMin + 0.5, Math.min(B.xMax - 0.5, pt.x));
+          const z = Math.max(B.zMin, Math.min(B.zMax, pt.z));
+          spawnRipple(pt.x, pt.z);
+          let best = null, bestD = 1e9;
+          for (const k in critters) {
+            const c = critters[k];
+            if (!c.active) continue;
+            const d = Math.hypot(c.pos.x - x, c.pos.y - z);
+            if (d < bestD) { bestD = d; best = c; }
+          }
+          if (best) best.callTo(x, z);
+        }
+      }
+    });
+
+    clock = new T.Clock();
+    // respect reduced-motion: no camera drift/breathing
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      driftOn = false;
+    }
+    window.addEventListener('resize', onResize);
+    animate();
+  }
+
+  // ---- campfire-forest backdrop: mountain ridges, bare trees, cloud bands ----
+  function silhouetteMat(color) {
+    return new T.MeshBasicMaterial({ color: color });
+  }
+  function buildRidge(zPos, height, color) {
+    const shape = new T.Shape();
+    shape.moveTo(-48, -0.5);
+    let x = -48;
+    while (x < 48) {
+      const nx = x + rand(3.5, 7.5);
+      shape.lineTo((x + nx) / 2, rand(height * 0.55, height));
+      shape.lineTo(nx, rand(0.6, height * 0.3));
+      x = nx;
+    }
+    shape.lineTo(48, -0.5);
+    shape.closePath();
+    const m = new T.Mesh(new T.ShapeGeometry(shape), silhouetteMat(color));
+    m.position.set(0, 0, zPos);
+    scene.add(m);
+  }
+  function buildTree(x, z, h) {
+    const g = new T.Group();
+    const matT = silhouetteMat(0x0f0a08);
+    const trunk = new T.Mesh(new T.CylinderGeometry(0.05, 0.16, h, 5), matT);
+    trunk.position.y = h / 2;
+    g.add(trunk);
+    const nB = 4 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < nB; i++) {
+      const f = 0.35 + (i / nB) * 0.6;          // height fraction
+      const len = (1.05 - f) * h * 0.42 + 0.3;
+      const br = new T.Mesh(new T.CylinderGeometry(0.012, 0.05, len, 4), matT);
+      const side = i % 2 === 0 ? 1 : -1;
+      br.position.y = len / 2;
+      const pivot = new T.Group();
+      pivot.position.y = h * f;
+      pivot.rotation.z = side * rand(0.85, 1.35);
+      pivot.rotation.y = rand(-0.6, 0.6);
+      pivot.add(br);
+      g.add(pivot);
+    }
+    g.position.set(x, 0, z);
+    g.rotation.y = rand(-0.3, 0.3);
+    g.userData.ph = Math.random() * 6;
+    scene.add(g);
+    treeGroups.push(g);
+  }
+  function buildEnvironment() {
+    // layered mountain silhouettes (fog fades the far one into the sky)
+    buildRidge(-19, 4.4, 0x1c1715);
+    buildRidge(-14, 2.7, 0x14100e);
+    // bare trees framing the edges
+    const spots = [
+      [-10.5, -7.5, 7.5], [-8.2, -4.5, 6], [-6.8, -2.6, 4.6],
+      [10.2, -7, 7.2], [8.0, -4.2, 5.8], [6.6, -2.8, 4.2],
+      [-12.5, -10, 8.5], [12.5, -10.5, 8.2]
+    ];
+    for (const [x, z, h] of spots) buildTree(x, z, h);
+    // slow dark cloud bands
+    const tex = makeGlowTex();
+    for (let i = 0; i < 4; i++) {
+      const c = new T.Sprite(new T.SpriteMaterial({
+        map: tex, color: 0x10181a, transparent: true,
+        opacity: rand(0.35, 0.5), depthWrite: false
+      }));
+      c.scale.set(rand(16, 26), rand(3, 5), 1);
+      c.position.set(rand(-14, 14), rand(9, 15), -17);
+      c.userData.vx = rand(0.06, 0.16) * (Math.random() < 0.5 ? -1 : 1);
+      scene.add(c);
+      clouds.push(c);
+    }
+  }
+
+  // ---- low-poly campfire ----
+  const FIRE_X = -2.3, FIRE_Z = -2.4;
+  function buildFire() {
+    const fire = new T.Group();
+    fire.position.set(FIRE_X, 0, FIRE_Z);
+    const logMat = new T.MeshStandardMaterial({ color: 0x2e1a0e, flatShading: true, roughness: 0.95 });
+    for (let i = 0; i < 5; i++) {
+      const log = new T.Mesh(new T.CylinderGeometry(0.07, 0.09, 1.15, 5), logMat);
+      const a = (i / 5) * Math.PI * 2 + 0.3;
+      log.rotation.z = Math.PI / 2 - 0.28;
+      log.rotation.y = a;
+      log.position.set(Math.cos(a) * 0.18, 0.16, Math.sin(a) * 0.18);
+      fire.add(log);
+    }
+    // ring of stones
+    const stoneMat = new T.MeshStandardMaterial({ color: 0x3a2f28, flatShading: true, roughness: 1 });
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      const s = new T.Mesh(new T.IcosahedronGeometry(rand(0.09, 0.15), 0), stoneMat);
+      s.position.set(Math.cos(a) * 0.78, 0.07, Math.sin(a) * 0.78);
+      s.rotation.set(rand(0, 3), rand(0, 3), rand(0, 3));
+      fire.add(s);
+    }
+    // layered flames
+    const flameDefs = [
+      { r: 0.5, h: 1.15, c: 0xff4d14, o: 0.55 },
+      { r: 0.34, h: 0.85, c: 0xff9226, o: 0.75 },
+      { r: 0.19, h: 0.55, c: 0xffd97a, o: 0.95 }
+    ];
+    flameDefs.forEach((d, i) => {
+      const f = new T.Mesh(
+        new T.ConeGeometry(d.r, d.h, 5),
+        new T.MeshBasicMaterial({
+          color: d.c, transparent: true, opacity: d.o,
+          blending: T.AdditiveBlending, depthWrite: false
+        })
+      );
+      f.position.y = d.h / 2 + 0.12;
+      fire.add(f);
+      flames.push({ mesh: f, baseH: d.h, ph: i * 2.1 });
+    });
+    // fire glow sprite hugging the ground
+    const fg = new T.Sprite(new T.SpriteMaterial({
+      map: makeGlowTex(), color: 0xff6a20, transparent: true, opacity: 0.55,
+      depthWrite: false, blending: T.AdditiveBlending
+    }));
+    fg.scale.set(3.6, 2.2, 1);
+    fg.position.y = 0.5;
+    fg.material.opacity = 0.45;
+    fire.add(fg);
+    scene.add(fire);
+    // flickering light
+    fireLight = new T.PointLight(0xff7a30, 1.5, 14, 2);
+    fireLight.position.set(FIRE_X, 1.1, FIRE_Z);
+    scene.add(fireLight);
+    // rising embers
+    const n = 26;
+    const geo = new T.BufferGeometry();
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      emberData.push(resetEmber({}));
+      pos[i * 3 + 1] = -1; // start hidden
+    }
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3));
+    emberPts = new T.Points(geo, new T.PointsMaterial({
+      color: 0xffa040, size: 0.07, transparent: true, opacity: 0.9,
+      depthWrite: false, blending: T.AdditiveBlending, sizeAttenuation: true
+    }));
+    emberPts.frustumCulled = false;
+    scene.add(emberPts);
+    // smoke wisps
+    for (let i = 0; i < 9; i++) {
+      const s = new T.Sprite(new T.SpriteMaterial({
+        map: makeGlowTex(), color: 0x57483c, transparent: true,
+        opacity: 0, depthWrite: false
+      }));
+      s.visible = false;
+      scene.add(s);
+      smoke.push(s);
+    }
+    window.Critters.FIRE = { x: FIRE_X, z: FIRE_Z };
+  }
+  function resetEmber(e) {
+    e.x = FIRE_X + rand(-0.15, 0.15); e.y = rand(0.2, 0.6); e.z = FIRE_Z + rand(-0.15, 0.15);
+    e.vy = rand(0.7, 1.6); e.vx = rand(-0.12, 0.12);
+    e.life = 0; e.maxLife = rand(1.2, 2.6);
+    return e;
+  }
+  function updateFire(dt) {
+    stoke = Math.max(0, stoke - stoke * dt * 1.4);
+    const flare = 1 + stoke * 0.38;
+    for (const f of flames) {
+      const s = (1 + Math.sin(elapsed * 9 + f.ph) * 0.13 + Math.sin(elapsed * 23 + f.ph * 3) * 0.07) * flare;
+      f.mesh.scale.set(1 + Math.sin(elapsed * 13 + f.ph) * 0.08, s, 1 + Math.cos(elapsed * 11 + f.ph) * 0.08);
+      f.mesh.position.y = (f.baseH / 2) * s + 0.12;
+      f.mesh.position.x = Math.sin(elapsed * 7 + f.ph) * 0.035;
+      f.mesh.rotation.y += dt * (0.6 + f.ph * 0.2);
+    }
+    fireLight.intensity = (1.45 + Math.sin(elapsed * 11) * 0.18 + Math.sin(elapsed * 31) * 0.12) * (1 + stoke * 0.55);
+    // marshmallow skewers sway gently in their owners' absent hands
+    const swayQ = new T.Quaternion();
+    const zAxis = new T.Vector3(0, 0, 1);
+    for (const m of marshSticks) {
+      swayQ.setFromAxisAngle(zAxis, Math.sin(elapsed * 1.2 + m.ph) * 0.028);
+      m.pivot.quaternion.copy(m.baseQ).multiply(swayQ);
+    }
+    const arr = emberPts.geometry.attributes.position.array;
+    for (let i = 0; i < emberData.length; i++) {
+      const e = emberData[i];
+      e.life += dt;
+      if (e.life > e.maxLife) resetEmber(e);
+      e.x += e.vx * dt + Math.sin(elapsed * 5 + i) * 0.004;
+      e.y += e.vy * dt;
+      arr[i * 3] = e.x; arr[i * 3 + 1] = e.y; arr[i * 3 + 2] = e.z;
+    }
+    emberPts.geometry.attributes.position.needsUpdate = true;
+    // glow follows the fire
+    glowSprite.position.x = FIRE_X * 0.6;
+    for (const c of clouds) {
+      c.position.x += c.userData.vx * dt * (1 + gust * 1.5);
+      if (c.position.x > 20) c.position.x = -20;
+      if (c.position.x < -20) c.position.x = 20;
+    }
+    // smoke wisps drifting with the wind
+    smokeTimer -= dt;
+    if (smokeTimer <= 0) {
+      smokeTimer = rand(0.45, 0.9);
+      const s = smoke.find(s => !s.visible);
+      if (s) {
+        s.visible = true;
+        s.userData.life = 0;
+        s.userData.maxLife = rand(2.6, 3.6);
+        s.position.set(FIRE_X + rand(-0.1, 0.1), rand(1.0, 1.3), FIRE_Z);
+        s.userData.drift = rand(-0.05, 0.12);
+      }
+    }
+    for (const s of smoke) {
+      if (!s.visible) continue;
+      s.userData.life += dt;
+      const t = s.userData.life / s.userData.maxLife;
+      if (t >= 1) { s.visible = false; continue; }
+      s.position.y += dt * 0.55;
+      s.position.x += dt * (s.userData.drift + gust * 0.5) + Math.sin(elapsed * 1.7 + s.userData.maxLife * 5) * 0.004;
+      const sc = 0.5 + t * 1.3;
+      s.scale.set(sc, sc * 0.8, 1);
+      s.material.opacity = Math.sin(t * Math.PI) * 0.15;
+    }
+  }
+
+  // ---- campsite: chairs + marshmallow skewers ----
+  function buildCampsite() {
+    const woodMat = new T.MeshStandardMaterial({ color: 0x4f3019, flatShading: true, roughness: 0.95 });
+    const woodDark = new T.MeshStandardMaterial({ color: 0x35200f, flatShading: true, roughness: 1 });
+
+    function chair(x, z) {
+      const g = new T.Group();
+      for (const [lx, lz] of [[-0.22, -0.18], [0.22, -0.18], [-0.22, 0.18], [0.22, 0.18]]) {
+        const leg = new T.Mesh(new T.CylinderGeometry(0.03, 0.035, 0.42, 5), woodDark);
+        leg.position.set(lx, 0.21, lz);
+        g.add(leg);
+      }
+      const seat = new T.Mesh(new T.BoxGeometry(0.56, 0.07, 0.46), woodMat);
+      seat.position.y = 0.45;
+      g.add(seat);
+      for (const lx of [-0.22, 0.22]) {
+        const post = new T.Mesh(new T.CylinderGeometry(0.025, 0.03, 0.52, 5), woodDark);
+        post.position.set(lx, 0.72, -0.24);
+        post.rotation.x = 0.16;
+        g.add(post);
+      }
+      for (const hy of [0.7, 0.88]) {
+        const slat = new T.Mesh(new T.BoxGeometry(0.5, 0.1, 0.045), woodMat);
+        slat.position.set(0, hy, -0.24 - (hy - 0.45) * 0.16);
+        slat.rotation.x = 0.16;
+        g.add(slat);
+      }
+      g.position.set(x, 0, z);
+      // face the fire, with a casual offset
+      g.rotation.y = Math.atan2(FIRE_X - x, FIRE_Z - z) + rand(-0.14, 0.14);
+      scene.add(g);
+    }
+    chair(FIRE_X - 1.6, FIRE_Z - 0.75);
+    chair(FIRE_X - 0.15, FIRE_Z - 1.55);
+    chair(FIRE_X + 1.55, FIRE_Z - 0.6);
+
+    const stickMat = new T.MeshStandardMaterial({ color: 0x6b4a26, flatShading: true, roughness: 1 });
+    function skewer(bx, bz, toastColor) {
+      const pivot = new T.Group();
+      pivot.position.set(bx, 0.12, bz);
+      const tip = new T.Vector3(FIRE_X + rand(-0.1, 0.1), rand(0.8, 0.98), FIRE_Z + rand(-0.1, 0.1));
+      const dir = tip.clone().sub(pivot.position);
+      const len = dir.length();
+      const stick = new T.Mesh(new T.CylinderGeometry(0.014, 0.022, len, 4), stickMat);
+      stick.position.y = len / 2;
+      pivot.add(stick);
+      const marsh = new T.Mesh(
+        new T.CylinderGeometry(0.078, 0.078, 0.12, 6),
+        new T.MeshStandardMaterial({ color: 0xf6efdf, flatShading: true, roughness: 0.55 })
+      );
+      marsh.position.y = len - 0.03;
+      pivot.add(marsh);
+      // toasted ring on the fire side
+      const toast = new T.Mesh(
+        new T.CylinderGeometry(0.08, 0.08, 0.04, 6),
+        new T.MeshStandardMaterial({ color: toastColor, flatShading: true, roughness: 0.7 })
+      );
+      toast.position.y = len - 0.1;
+      pivot.add(toast);
+      pivot.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir.normalize());
+      scene.add(pivot);
+      marshSticks.push({ pivot: pivot, baseQ: pivot.quaternion.clone(), ph: Math.random() * 6 });
+    }
+    skewer(FIRE_X - 1.25, FIRE_Z - 0.6, 0xd9a25e);
+    skewer(FIRE_X + 1.2, FIRE_Z - 0.75, 0xa5612a);
+    skewer(FIRE_X + 0.35, FIRE_Z - 1.35, 0xc88b46);
+  }
+
+  // ---- shooting stars ----
+  function spawnShoot() {
+    const s = new T.Sprite(new T.SpriteMaterial({
+      map: makeGlowTex(), color: 0xeef2ff, transparent: true, opacity: 0,
+      depthWrite: false, blending: T.AdditiveBlending
+    }));
+    s.scale.set(2.6, 0.07, 1);
+    s.position.set(rand(-16, 2), rand(11, 16), -16.5);
+    s.userData.vx = rand(9, 14);
+    s.userData.vy = -rand(2.5, 4);
+    s.userData.life = 0;
+    scene.add(s);
+    shoots.push(s);
+  }
+  function updateShoots(dt) {
+    shootTimer -= dt;
+    if (shootTimer <= 0) {
+      shootTimer = rand(20, 45);
+      spawnShoot();
+    }
+    for (let i = shoots.length - 1; i >= 0; i--) {
+      const s = shoots[i];
+      s.userData.life += dt;
+      const t = s.userData.life / 1.1;
+      if (t >= 1) { scene.remove(s); s.material.dispose(); shoots.splice(i, 1); continue; }
+      s.position.x += s.userData.vx * dt;
+      s.position.y += s.userData.vy * dt;
+      s.material.opacity = Math.sin(t * Math.PI) * 0.85;
+      s.material.rotation = Math.atan2(-s.userData.vy, s.userData.vx) * -1;
+    }
+  }
+
+  let glowTexCache = null;
+  function makeGlowTex() {
+    if (glowTexCache) return glowTexCache;
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.4, 'rgba(255,180,110,0.5)');
+    g.addColorStop(1, 'rgba(255,150,90,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    glowTexCache = new T.CanvasTexture(c);
+    return glowTexCache;
+  }
+
+  // ---- Rain as falling line segments ----
+  function buildRain() {
+    const geo = new T.BufferGeometry();
+    const positions = new Float32Array(rainMax * 2 * 3);
+    rainData = [];
+    for (let i = 0; i < rainMax; i++) {
+      const drop = {
+        x: rand(-16, 16),
+        y: rand(0, 20),
+        z: rand(-9, 7),
+        len: rand(0.4, 0.9),
+        speed: rand(9, 15)
+      };
+      rainData.push(drop);
+      writeDrop(positions, i, drop);
+    }
+    geo.setAttribute('position', new T.BufferAttribute(positions, 3));
+    const matr = new T.LineBasicMaterial({
+      color: 0xb9cdf0, transparent: true, opacity: 0.4
+    });
+    rainObj = new T.LineSegments(geo, matr);
+    rainObj.frustumCulled = false;
+    scene.add(rainObj);
+    applyRainLevel();
+  }
+
+  // ---- heart particles (petting reward) ----
+  let heartTex = null;
+  function getHeartTex() {
+    if (heartTex) return heartTex;
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.translate(32, 30);
+    ctx.fillStyle = '#ff9eb0';
+    ctx.beginPath();
+    ctx.moveTo(0, 8);
+    ctx.bezierCurveTo(-22, -10, -10, -26, 0, -12);
+    ctx.bezierCurveTo(10, -26, 22, -10, 0, 8);
+    ctx.fill();
+    heartTex = new T.CanvasTexture(c);
+    return heartTex;
+  }
+  function spawnHearts(x, z, tint) {
+    for (let i = 0; i < 5; i++) {
+      const s = new T.Sprite(new T.SpriteMaterial({
+        map: getHeartTex(), transparent: true, opacity: 0.95, depthWrite: false
+      }));
+      const sc = rand(0.16, 0.3);
+      s.scale.set(sc, sc, 1);
+      s.position.set(x + rand(-0.4, 0.4), rand(0.8, 1.4), z + rand(-0.2, 0.3));
+      s.userData.v = new T.Vector3(rand(-0.4, 0.4), rand(1.2, 2.2), rand(-0.2, 0.2));
+      s.userData.life = 0;
+      scene.add(s);
+      hearts.push(s);
+    }
+  }
+  function updateHearts(dt) {
+    for (let i = hearts.length - 1; i >= 0; i--) {
+      const s = hearts[i];
+      s.userData.life += dt;
+      const t = s.userData.life / 1.3;
+      if (t >= 1) {
+        scene.remove(s); s.material.dispose(); hearts.splice(i, 1);
+        continue;
+      }
+      s.position.addScaledVector(s.userData.v, dt);
+      s.position.x += Math.sin(s.userData.life * 6) * 0.01;
+      s.material.opacity = 0.95 * (1 - t * t);
+    }
+  }
+
+  // ---- splash ripples where drops land ----
+  function buildRipples() {
+    const geo = new T.RingGeometry(1, 1.16, 22);
+    for (let i = 0; i < 22; i++) {
+      const m = new T.Mesh(geo, new T.MeshBasicMaterial({
+        color: 0x9fb4e8, transparent: true, opacity: 0, depthWrite: false
+      }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = 0.015;
+      m.visible = false;
+      m.userData.life = 0;
+      scene.add(m);
+      ripples.push(m);
+    }
+  }
+  function spawnRipple(x, z) {
+    const r = ripples.find(r => !r.visible);
+    if (!r) return;
+    r.visible = true;
+    r.userData.life = 0;
+    r.position.set(x, 0.015, z);
+  }
+  function updateRipples(dt) {
+    for (const r of ripples) {
+      if (!r.visible) continue;
+      r.userData.life += dt;
+      const t = r.userData.life / 0.65;
+      if (t >= 1) { r.visible = false; continue; }
+      const s = 0.06 + t * 0.5;
+      r.scale.set(s, s, s);
+      r.material.opacity = 0.32 * (1 - t) * (0.3 + rainLevel * 0.7);
+    }
+  }
+
+  // ---- drifting mist banks ----
+  function buildMist() {
+    const tex = makeGlowTex();
+    for (let i = 0; i < 6; i++) {
+      const s = new T.Sprite(new T.SpriteMaterial({
+        map: tex, color: 0x8fa3d8, transparent: true,
+        opacity: 0.05 + Math.random() * 0.05, depthWrite: false
+      }));
+      s.scale.set(rand(9, 15), rand(2.5, 4.5), 1);
+      s.position.set(rand(-11, 11), rand(0.4, 2.6), rand(-6, 2.5));
+      s.userData.vx = rand(0.12, 0.3) * (Math.random() < 0.5 ? -1 : 1);
+      scene.add(s);
+      mists.push(s);
+    }
+  }
+  function updateMist(dt) {
+    for (const s of mists) {
+      s.position.x += s.userData.vx * dt;
+      if (s.position.x > 15) s.position.x = -15;
+      if (s.position.x < -15) s.position.x = 15;
+      const base = s.userData.baseOp != null ? s.userData.baseOp : (s.userData.baseOp = s.material.opacity);
+      s.material.opacity = base * mistLevel * 2;
+    }
+  }
+
+  // ---- floating amber dust motes ----
+  function buildDust() {
+    const n = 42;
+    const geo = new T.BufferGeometry();
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const d = {
+        x: rand(-9, 9), y: rand(0.3, 4.5), z: rand(-5, 3.5),
+        ph: Math.random() * Math.PI * 2, sp: rand(0.3, 0.8)
+      };
+      dustData.push(d);
+      pos[i * 3] = d.x; pos[i * 3 + 1] = d.y; pos[i * 3 + 2] = d.z;
+    }
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3));
+    dustPts = new T.Points(geo, new T.PointsMaterial({
+      color: 0xffc488, size: 0.055, transparent: true, opacity: 0.55,
+      depthWrite: false, blending: T.AdditiveBlending, sizeAttenuation: true
+    }));
+    dustPts.frustumCulled = false;
+    scene.add(dustPts);
+  }
+  function updateDust(dt) {
+    elapsed += dt;
+    const arr = dustPts.geometry.attributes.position.array;
+    for (let i = 0; i < dustData.length; i++) {
+      const d = dustData[i];
+      arr[i * 3] = d.x + Math.sin(elapsed * d.sp + d.ph) * 0.6;
+      arr[i * 3 + 1] = d.y + Math.sin(elapsed * d.sp * 0.7 + d.ph * 2) * 0.35;
+    }
+    dustPts.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // ---- celebration sparkle burst ----
+  function celebrateBurst() {
+    const tex = makeGlowTex();
+    for (let i = 0; i < 28; i++) {
+      const s = new T.Sprite(new T.SpriteMaterial({
+        map: tex, color: i % 3 ? 0xffc079 : 0xfff0dc,
+        transparent: true, opacity: 0.95, depthWrite: false,
+        blending: T.AdditiveBlending
+      }));
+      const sc = rand(0.12, 0.38);
+      s.scale.set(sc, sc, 1);
+      s.position.set(rand(-1.2, 1.2), rand(0.8, 2.4), rand(-0.5, 1.8));
+      s.userData.v = new T.Vector3(rand(-2.4, 2.4), rand(2.5, 5.5), rand(-1.2, 1.2));
+      s.userData.life = 0;
+      scene.add(s);
+      burst.push(s);
+    }
+  }
+  function updateBurst(dt) {
+    for (let i = burst.length - 1; i >= 0; i--) {
+      const s = burst[i];
+      s.userData.life += dt;
+      const t = s.userData.life / 1.5;
+      if (t >= 1) {
+        scene.remove(s);
+        s.material.dispose();
+        burst.splice(i, 1);
+        continue;
+      }
+      s.userData.v.y -= 4.2 * dt;
+      s.position.addScaledVector(s.userData.v, dt);
+      if (s.position.y < 0.05) { s.position.y = 0.05; s.userData.v.y *= -0.4; }
+      s.material.opacity = 0.95 * (1 - t);
+    }
+  }
+
+  function writeDrop(arr, i, d) {
+    const o = i * 6;
+    const slant = windSlant;
+    arr[o] = d.x; arr[o + 1] = d.y; arr[o + 2] = d.z;
+    arr[o + 3] = d.x - d.len * slant; arr[o + 4] = d.y - d.len; arr[o + 5] = d.z;
+  }
+
+  function applyRainLevel() {
+    const count = Math.round(rainMax * rainLevel);
+    rainObj.geometry.setDrawRange(0, count * 2);
+    rainObj.material.opacity = 0.18 + rainLevel * 0.34;
+  }
+
+  function updateRain(dt) {
+    const count = Math.round(rainMax * rainLevel);
+    const arr = rainObj.geometry.attributes.position.array;
+    for (let i = 0; i < count; i++) {
+      const d = rainData[i];
+      d.y -= d.speed * dt;
+      d.x -= d.speed * windSlant * dt;
+      if (d.y < 0) {
+        if (d.z > -4 && d.z < 5 && Math.abs(d.x) < 11 && Math.random() < 0.22) {
+          spawnRipple(d.x, d.z);
+        }
+        d.y = rand(16, 22);
+        d.x = rand(-16, 16);
+        d.z = rand(-9, 7);
+      }
+      writeDrop(arr, i, d);
+    }
+    rainObj.geometry.attributes.position.needsUpdate = true;
+  }
+
+  function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    let dt = clock.getDelta();
+    if (dt > 0.05) dt = 0.05;
+
+    // mode resolution
+    let effMode = mode;
+    if (mode === 'celebrate' && performance.now() > celebrateUntil) {
+      mode = 'idle';
+      effMode = 'idle';
+    }
+    env.mode = mode;
+
+    for (const k in critters) critters[k].update(dt, env);
+    updateRain(dt);
+    updateRipples(dt);
+    updateMist(dt);
+    updateDust(dt);
+    updateBurst(dt);
+    updateHearts(dt);
+    updateFire(dt);
+    updateShoots(dt);
+
+    // wind gusts: sway trees, slant rain, hurry the mist
+    gustTimer -= dt;
+    if (gustTimer <= 0) {
+      gustTimer = rand(5, 11);
+      gustTarget = Math.random() < 0.45 ? rand(0.4, 1) : rand(0, 0.2);
+    }
+    gust += (gustTarget - gust) * Math.min(1, dt * 0.7);
+    windSlant = 0.12 + gust * 0.22;
+    for (const g of treeGroups) {
+      g.rotation.z = Math.sin(elapsed * 0.7 + g.userData.ph) * 0.012 * (1 + gust * 2.2);
+    }
+
+    // star twinkle
+    starPts[0].material.opacity = 0.35 + Math.sin(elapsed * 0.9) * 0.25;
+    starPts[1].material.opacity = 0.35 + Math.cos(elapsed * 1.3) * 0.25;
+
+    // gentle camera parallax + slow cinematic breathing
+    if (!freeCam && driftOn) {
+      camera.position.x += (mouseX * 0.55 - camera.position.x) * Math.min(1, dt * 2);
+      camera.position.y += (4.6 - mouseY * 0.3 + Math.sin(elapsed * 0.09) * 0.14 - camera.position.y) * Math.min(1, dt * 2);
+      camera.position.z = 9.4 + Math.sin(elapsed * 0.07) * 0.35;
+      camera.lookAt(0, 1.3, 0);
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ---- Public API ----
+  window.Watch = {
+    init,
+    setRain(level0to100) {
+      rainLevel = Math.max(0, Math.min(1, level0to100 / 100));
+      if (rainObj) applyRainLevel();
+    },
+    setAnimalActive(type, on) {
+      if (critters[type]) critters[type].setActive(on);
+    },
+    setMode(m) {
+      const prev = mode;
+      mode = m;
+      env.mode = m;
+      if (m === 'focus' && prev !== 'focus') {
+        // everyone perks up + re-gathers
+        for (const k in critters) {
+          critters[k].perk();
+          critters[k].pickTarget('focus');
+          critters[k].state = 'walk';
+        }
+      }
+    },
+    setTheme(name) {
+      const t = THEMES[name];
+      if (!t) return;
+      theme = name;
+      scene.fog.color.setHex(t.fog);
+      lights.hemi.color.setHex(t.hemiSky);
+      lights.hemi.groundColor.setHex(t.hemiGround);
+      lights.dir.color.setHex(t.dir);
+      lights.warm.color.setHex(t.warm);
+      lights.rim.color.setHex(t.rim);
+      lights.amb.color.setHex(t.amb);
+      glowSprite.material.color.setHex(t.glow);
+      rainObj.material.color.setHex(t.rain);
+      dustPts.material.color.setHex(t.dust);
+      moonSprite.children[1].material.color.setHex(t.moon);
+      moonSprite.children[1].material.opacity = t.moonOpacity + 0.25;
+      moonSprite.children[0].material.opacity = t.moonOpacity * 0.35;
+      for (const s of mists) s.material.color.setHex(t.mist);
+      document.body.className = 'theme-' + name;
+    },
+    setMist(level0to100) {
+      mistLevel = Math.max(0, Math.min(1, level0to100 / 100));
+    },
+    setDust(on) {
+      if (dustPts) dustPts.visible = !!on;
+    },
+    setDrift(on) { driftOn = !!on; },
+    setPace(mul) {
+      for (const k in critters) critters[k].speedMul = mul;
+    },
+    celebrate(durationSec) {
+      mode = 'celebrate';
+      env.mode = 'celebrate';
+      celebrateUntil = performance.now() + (durationSec || 6) * 1000;
+      for (const k in critters) critters[k].perk();
+      celebrateBurst();
+      this.stoke(1.6);
+    },
+    stoke(power) {
+      stoke = Math.min(2.2, stoke + (power || 0.6));
+      // a puff of fast embers
+      let n = 0;
+      for (const e of emberData) {
+        if (n >= 8) break;
+        if (e.life > e.maxLife * 0.5) {
+          resetEmber(e);
+          e.vy *= 1.9;
+          e.vx *= 2.2;
+          n++;
+        }
+      }
+    },
+    _step(frames, dt) {
+      frames = frames || 60; dt = dt || 0.033;
+      for (let f = 0; f < frames; f++) {
+        for (const k in critters) critters[k].update(dt, env);
+        updateRain(dt);
+      }
+      renderer.render(scene, camera);
+    },
+    _special(type, name, t) {
+      const c = critters[type];
+      if (!c) return;
+      c.state = 'special';
+      c.special = name;
+      c.specialT = t || 0;
+      c.restTimer = 99;
+    },
+    _inspect() {
+      const order = ['redpanda', 'cat', 'shiba'];
+      order.forEach((t, i) => {
+        const c = critters[t];
+        if (!c) return;
+        c.active = true; c.group.visible = true;
+        c.pos.set(-3.0 + i * 3.0, 0);
+        c.target.copy(c.pos);
+        c.heading = 0.6; c.state = 'idle'; c.restTimer = 99999;
+        c.walking = false; c.sitAmt = 0; c.bob = 0;
+        c.earPerk = 0; c.celebT = 0;
+        c.group.position.set(c.pos.x, 0, c.pos.y);
+        c.group.rotation.y = 0.6;
+      });
+      freeCam = true;
+      camera.position.set(0, 1.4, 6.5);
+      camera.lookAt(0, 0.6, 0);
+      document.getElementById('ui').style.display = 'none';
+      document.getElementById('bottom').style.display = 'none';
+    }
+  };
+})();
+
+  </script>
+  <script>
+  (function () {
+    const LS = 'studywatch.v1';
+    const watchEl = document.getElementById('watch');
+    const watchWrap = document.getElementById('watchWrap');
+    const ringProg = document.querySelector('#ring .prog');
+    const RING_C = 304.7;
+    const pulseEl = document.getElementById('pulse');
+    const statsEl = document.getElementById('stats');
+
+    function firePulse() {
+      pulseEl.classList.remove('go');
+      void pulseEl.offsetWidth;
+      pulseEl.classList.add('go');
+      if (window.Watch.stoke) window.Watch.stoke(0.7);
+    }
+
+    // ---- daily stats ----
+    const STATS_LS = 'studywatch.stats.v1';
+    function loadStats() {
+      const today = new Date().toISOString().slice(0, 10);
+      try {
+        const s = JSON.parse(localStorage.getItem(STATS_LS));
+        if (s && s.date === today) return s;
+      } catch (e) {}
+      return { date: today, minutes: 0, sessions: 0 };
+    }
+    let stats = loadStats();
+    function renderStats() {
+      if (stats.sessions === 0) { statsEl.classList.remove('show'); return; }
+      statsEl.innerHTML = 'Today &middot; <b>' + stats.minutes + ' min</b> &middot; ' +
+        stats.sessions + (stats.sessions === 1 ? ' session' : ' sessions');
+      statsEl.classList.add('show');
+      statsEl.classList.remove('bump');
+      void statsEl.offsetWidth;
+      statsEl.classList.add('bump');
+    }
+
+    // pet toast
+    const PET_NAMES = { redpanda: 'Miso', cat: 'Mochi', shiba: 'Hachi' };
+    const PET_LINES = ['loved that', 'is happy', 'purrs', 'wiggles', 'feels cozy'];
+    const toastEl = document.getElementById('toast');
+    let toastTimer = null;
+    window.Watch.onPet = function (type) {
+      const line = type === 'cat' ? (Math.random() < 0.4 ? 'purrs' : PET_LINES[Math.floor(Math.random() * PET_LINES.length)])
+        : PET_LINES[Math.floor(Math.random() * PET_LINES.length)];
+      toastEl.innerHTML = '<span class="heart">&hearts;</span>' + PET_NAMES[type] + ' ' + line;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1500);
+    };
+    const labelEl = document.getElementById('label');
+    const sublineEl = document.getElementById('subline');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const presets = document.getElementById('presets');
+    const rainSlider = document.getElementById('rain');
+
+    const clock = window.DotMatrix.createClock(document.getElementById('clock'));
+
+    // ---- state ----
+    let state = {
+      presetMin: 30,
+      remaining: 30 * 60,   // seconds
+      running: false,
+      endTime: 0,           // performance-now ms when running
+      rain: 45,
+      pets: { redpanda: true, cat: true, shiba: true }
+    };
+
+    // restore
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS));
+      if (saved) {
+        state.presetMin = saved.presetMin ?? 30;
+        state.rain = saved.rain ?? 45;
+        state.pets = saved.pets ?? state.pets;
+        if (saved.running && saved.endTimeAbs) {
+          const rem = (saved.endTimeAbs - Date.now()) / 1000;
+          if (rem > 0) { state.remaining = rem; state.running = true; }
+          else { state.remaining = saved.presetMin * 60; state.running = false; }
+        } else {
+          state.remaining = saved.remaining ?? saved.presetMin * 60;
+        }
+      }
+    } catch (e) {}
+
+    function save() {
+      localStorage.setItem(LS, JSON.stringify({
+        presetMin: state.presetMin,
+        remaining: state.remaining,
+        rain: state.rain,
+        pets: state.pets,
+        running: state.running,
+        endTimeAbs: state.running ? Date.now() + state.remaining * 1000 : 0
+      }));
+    }
+
+    // ---- star field ----
+    (function () {
+      const sky = document.getElementById('sky');
+      for (let i = 0; i < 110; i++) {
+        const s = document.createElement('span');
+        s.className = 'star' + (Math.random() < 0.12 ? ' bright' : '');
+        const sz = (Math.random() * 1.7 + 0.8).toFixed(1);
+        s.style.width = sz + 'px';
+        s.style.height = sz + 'px';
+        s.style.left = (Math.random() * 100).toFixed(2) + '%';
+        // denser toward the top of the sky
+        s.style.top = (Math.pow(Math.random(), 1.6) * 54).toFixed(2) + '%';
+        s.style.setProperty('--d', (2.2 + Math.random() * 4).toFixed(1) + 's');
+        s.style.animationDelay = (Math.random() * 6).toFixed(1) + 's';
+        sky.appendChild(s);
+      }
+    })();
+
+    // ---- init scene ----
+    window.Watch.init(document.getElementById('scene'));
+    window.Watch.setTheme('ember');
+    window.Watch.setRain(state.rain);
+    rainSlider.value = state.rain;
+    for (const t in state.pets) window.Watch.setAnimalActive(t, state.pets[t]);
+    document.querySelectorAll('.pet').forEach(p => {
+      p.classList.toggle('on', state.pets[p.dataset.type]);
+    });
+    // sync preset chips
+    document.querySelectorAll('.chip').forEach(c => {
+      c.classList.toggle('active', +c.dataset.min === state.presetMin);
+    });
+
+    // ---- render display ----
+    let colonOn = true;
+    function render() {
+      clock.setTime(state.remaining);
+      clock.setColon(colonOn);
+      watchEl.classList.toggle('running', state.running);
+      const total = state.presetMin * 60;
+      const paused = !state.running && state.remaining > 0 && state.remaining < total;
+      watchWrap.classList.toggle('running', state.running);
+      watchWrap.classList.toggle('paused', paused);
+      ringProg.style.strokeDashoffset = (RING_C * (1 - state.remaining / total)).toFixed(1);
+      if (state.running) {
+        labelEl.textContent = 'Focusing';
+        sublineEl.textContent = 'Stay with it';
+      } else if (state.remaining <= 0) {
+        labelEl.textContent = 'Done';
+        sublineEl.textContent = 'Well studied';
+      } else if (paused) {
+        labelEl.textContent = 'Paused';
+        sublineEl.textContent = 'Take a breath';
+      } else {
+        labelEl.textContent = 'Ready';
+        sublineEl.textContent = state.presetMin + ' minute session';
+      }
+      startBtn.textContent = state.running ? 'Pause' : (state.remaining <= 0 ? 'Restart' : 'Start');
+      startBtn.classList.toggle('running', state.running);
+      renderTitle();
+    }
+
+    // ---- timer loop ----
+    let lastQ = 0;
+    function checkTimer() {
+      if (!state.running) return;
+      const rem = (state.endTime - performance.now()) / 1000;
+      state.remaining = Math.max(0, rem);
+      // quarter-session milestone pulses
+      const total = state.presetMin * 60;
+      const q = Math.floor((1 - state.remaining / total) * 4);
+      if (q > lastQ && q < 4) { lastQ = q; firePulse(); }
+      if (state.remaining <= 0) finish();
+    }
+    function tick() {
+      checkTimer();
+      render();
+      requestAnimationFrame(tick);
+    }
+    // safety net: rAF is throttled/paused in background tabs, but study
+    // sessions usually run while you work in ANOTHER tab — keep the timer,
+    // milestones, finish + title honest with a steady interval.
+    setInterval(() => { checkTimer(); renderTitle(); }, 1000);
+
+    // tab title countdown
+    let lastTitle = '';
+    function renderTitle() {
+      let t;
+      if (state.running) {
+        const m = Math.floor(state.remaining / 60);
+        const s = Math.floor(state.remaining % 60);
+        t = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + ' \u00b7 Study Watch';
+      } else if (state.remaining <= 0) {
+        t = '\u2713 Done \u00b7 Study Watch';
+      } else {
+        t = 'Study Watch';
+      }
+      if (t !== lastTitle) { document.title = t; lastTitle = t; }
+    }
+
+    // colon blink
+    setInterval(() => {
+      colonOn = state.running ? !colonOn : true;
+    }, 500);
+
+    // periodic save
+    setInterval(() => { if (state.running) save(); }, 2000);
+
+    function start() {
+      if (state.remaining <= 0) state.remaining = state.presetMin * 60;
+      state.running = true;
+      state.endTime = performance.now() + state.remaining * 1000;
+      lastQ = Math.floor((1 - state.remaining / (state.presetMin * 60)) * 4);
+      watchEl.classList.remove('finished');
+      window.Watch.setMode('focus');
+      firePulse();
+      save();
+    }
+    function pause() {
+      state.running = false;
+      window.Watch.setMode('idle');
+      save();
+    }
+    function reset() {
+      state.running = false;
+      state.remaining = state.presetMin * 60;
+      watchEl.classList.remove('finished');
+      window.Watch.setMode('idle');
+      save();
+    }
+    function finish() {
+      state.running = false;
+      state.remaining = 0;
+      watchEl.classList.add('finished');
+      window.Watch.celebrate(7);
+      firePulse();
+      stats = loadStats();
+      stats.minutes += state.presetMin;
+      stats.sessions += 1;
+      localStorage.setItem(STATS_LS, JSON.stringify(stats));
+      renderStats();
+      setTimeout(() => watchEl.classList.remove('finished'), 7000);
+      save();
+    }
+
+    // ---- events ----
+    startBtn.addEventListener('click', () => {
+      if (state.running) pause(); else start();
+    });
+    resetBtn.addEventListener('click', reset);
+
+    presets.addEventListener('click', e => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      state.presetMin = +chip.dataset.min;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      if (!state.running) { state.remaining = state.presetMin * 60; watchEl.classList.remove('finished'); }
+      save();
+    });
+
+    rainSlider.addEventListener('input', () => {
+      state.rain = +rainSlider.value;
+      window.Watch.setRain(state.rain);
+      save();
+    });
+
+    document.getElementById('bottom').addEventListener('click', e => {
+      const pet = e.target.closest('.pet');
+      if (!pet) return;
+      const t = pet.dataset.type;
+      // keep at least one friend
+      const onCount = Object.values(state.pets).filter(Boolean).length;
+      if (state.pets[t] && onCount <= 1) return;
+      state.pets[t] = !state.pets[t];
+      pet.classList.toggle('on', state.pets[t]);
+      window.Watch.setAnimalActive(t, state.pets[t]);
+      save();
+    });
+
+    // keyboard shortcuts
+    window.addEventListener('keydown', e => {
+      if (e.target.matches('input, textarea, select')) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (state.running) pause(); else start();
+      } else if (e.key === 'r' || e.key === 'R') {
+        reset();
+      }
+    });
+
+    // resume focus mode if restored running
+    if (state.running) {
+      state.endTime = performance.now() + state.remaining * 1000;
+      window.Watch.setMode('focus');
+    }
+
+    render();
+    renderStats();
+    tick();
+  })();
+  </script>
+</body>
+</html>
