@@ -4,7 +4,7 @@ A cozy little campfire to study beside.
 
 A glass timer hangs over a rainy, low-poly night camp — pick **10 / 30 / 45 / 60** minutes, hit Start, and get to work while three tiny friends keep the fire company.
 
-![Study Watch](screenshots/readme-hero.png)
+![Study Watch](Studywatch/screenshots/readme-hero.png)
 
 ## The friends
 
@@ -16,7 +16,7 @@ A glass timer hangs over a rainy, low-poly night camp — pick **10 / 30 / 45 / 
 
 They wander wherever they like, nap by the flames (Zzz…), and perk up when you start a session.
 
-![Camp life](screenshots/readme-camp.png)
+![Camp life](Studywatch/screenshots/readme-camp.png)
 
 ## Things to try
 
@@ -26,7 +26,7 @@ They wander wherever they like, nap by the flames (Zzz…), and perk up when you
 - **Watch the fire** — it flares and spits embers at every quarter milestone of your session
 - **Finish a session** — everyone sprints to the fire and parties
 
-![Celebration](screenshots/readme-party.png)
+![Celebration](Studywatch/screenshots/readme-party.png)
 
 ## Quiet details
 
